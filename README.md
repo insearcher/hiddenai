@@ -26,9 +26,12 @@ A macOS application that creates a floating, hideable window for interacting wit
 1. Download the latest release from the [Releases](https://github.com/insearcher/HiddenAI/releases) page
 2. Mount the DMG by double-clicking it
 3. Drag the HiddenAI application to your Applications folder
-4. When you first try to open the app, right-click (or Control-click) on the app icon and select "Open"
-5. Click "Open" in the dialog box that appears (this is needed because the app is not signed with an Apple Developer ID)
-6. Enter your OpenAI API key in Settings
+4. **Important macOS Security Note:**
+   - Since this app is not signed with an Apple Developer certificate, macOS security features will block it
+   - To fix this, open Terminal and run: `xattr -cr /Applications/HiddenAIClient.app`
+   - This command removes the quarantine attribute that macOS adds to downloaded applications
+   - After running this command, you can open the app normally from your Applications folder
+5. Enter your OpenAI API key in Settings
 
 ### Option 2: Build from Source
 
@@ -77,6 +80,25 @@ The application requires the following permissions:
 - No data is sent to any server except OpenAI's API (using your API key)
 - The application does not collect any telemetry or usage data
 
+## Troubleshooting
+
+### App Won't Open or Shows "App is Damaged" Message
+
+This happens because macOS adds a "quarantine" attribute to applications downloaded from the internet as a security measure. To fix this:
+
+1. Open Terminal (from Applications/Utilities)
+2. Run this command:
+   ```
+   xattr -cr /Applications/HiddenAIClient.app
+   ```
+3. Try opening the app again
+
+### What Does the Command Do?
+
+- `xattr`: This command manages extended attributes on files
+- `-cr`: Removes (-r) all attributes recursively through the application bundle, including the quarantine (-c) attribute
+- This is completely safe and simply tells macOS that you trust this application
+
 ## Contributing
 
 Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for more details.
@@ -100,8 +122,6 @@ The workflow will:
 - Create a DMG package
 - Generate a changelog based on commits since the last release
 - Create a GitHub release with the DMG file attached
-
-Note: Since the application is not signed with an Apple Developer ID, users will need to bypass Gatekeeper to run it as explained in the installation section.
 
 ## Acknowledgments
 
