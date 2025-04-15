@@ -1,5 +1,8 @@
 name: Build and Release
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -78,7 +81,5 @@ jobs:
           prerelease: false
           files: |
             dist/HiddenAI-${{ github.event.inputs.version }}.dmg
-        permissions:
-          contents: write
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
