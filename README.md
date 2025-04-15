@@ -2,7 +2,7 @@
 
 A macOS application that creates a floating, hideable window for interacting with OpenAI's GPT-4o. Capture screenshots, record audio, and get AI assistance directly on your desktop.
 
-![HiddenAI Screenshot Placeholder](docs/images/screenshot_placeholder.png)
+![HiddenAI Screenshot Placeholder](docs/images/preview.png)
 
 ## Features
 
@@ -23,7 +23,7 @@ A macOS application that creates a floating, hideable window for interacting wit
 
 ### Option 1: Download the Release
 
-1. Download the latest release from the [Releases](https://github.com/yourusername/HiddenAI/releases) page
+1. Download the latest release from the [Releases](https://github.com/insearcher/hiddenai/releases) page
 2. Move to your Applications folder
 3. Launch the application
 4. Enter your OpenAI API key in Settings
@@ -32,8 +32,8 @@ A macOS application that creates a floating, hideable window for interacting wit
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/HiddenAI.git
-   cd HiddenAI
+   git clone https://github.com/insearcher/hiddenai.git
+   cd hiddenai
    ```
 
 2. Open the project in Xcode:

@@ -9,7 +9,7 @@ Please be respectful and considerate of others when contributing to this project
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/yourusername/HiddenAI.git`
+2. Clone your fork: `git clone https://github.com/insearcher/hiddenai.git`
 3. Create a new branch for your changes: `git checkout -b feature/your-feature-name`
 4. Make your changes
 5. Test your changes thoroughly
@@ -68,10 +68,6 @@ When reporting bugs, please include:
 4. Actual behavior
 5. Screenshots (if applicable)
 6. Your environment (macOS version, app version)
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability, please do NOT open a public issue. Instead, email [security@example.com](mailto:security@example.com) with details.
 
 ## License
 
