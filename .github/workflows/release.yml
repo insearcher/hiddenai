@@ -78,3 +78,5 @@ jobs:
           prerelease: false
           files: |
             dist/HiddenAI-${{ github.event.inputs.version }}.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
