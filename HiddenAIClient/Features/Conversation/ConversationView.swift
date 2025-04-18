@@ -365,12 +365,7 @@ struct ConversationView: View {
                         }
                     }
                     .background(JetBrainsTheme.backgroundPrimary)
-                    .onReceive(timer) { _ in
-                        // Update Whisper recording time if needed
-                        if isWhisperRecording {
-                            whisperRecordingTime = WhisperTranscriptionService.shared.recordingTime()
-                        }
-                    }
+                    // We no longer need to poll for time updates since we're using notifications
                     // Detect when user manually scrolls
                     .simultaneousGesture(
                         DragGesture().onChanged { _ in
@@ -727,17 +722,40 @@ struct ConversationView: View {
             forName: .whisperRecordingStarted,
             object: nil,
             queue: .main
-        ) { _ in
+        ) { notification in
             isWhisperRecording = true
-            whisperRecordingTime = "00:00"
+            // Get initial time from notification if provided
+            if let userInfo = notification.object as? [String: String],
+               let initialTime = userInfo["timeString"] {
+                whisperRecordingTime = initialTime
+            } else {
+                whisperRecordingTime = "00:00"
+            }
         }
         
         NotificationCenter.default.addObserver(
             forName: .whisperRecordingStopped,
             object: nil,
             queue: .main
-        ) { _ in
+        ) { notification in
             isWhisperRecording = false
+            // Get final duration from notification if provided
+            if let userInfo = notification.object as? [String: String],
+               let finalDuration = userInfo["finalDuration"] {
+                print("Recording completed with duration: \(finalDuration)")
+            }
+        }
+        
+        // Add listener for time updates
+        NotificationCenter.default.addObserver(
+            forName: .whisperRecordingTimeUpdated,
+            object: nil,
+            queue: .main
+        ) { notification in
+            if let userInfo = notification.object as? [String: String],
+               let timeString = userInfo["timeString"] {
+                self.whisperRecordingTime = timeString
+            }
         }
         
         // Whisper transcription results

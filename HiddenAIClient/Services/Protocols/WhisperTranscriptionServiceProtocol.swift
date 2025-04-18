@@ -12,6 +12,9 @@ protocol WhisperTranscriptionServiceProtocol: SelfResolvable {
     /// Current recording state
     var isRecording: Bool { get }
     
+    /// Current recording time formatted as a string (MM:SS)
+    var recordingTimeString: String { get }
+    
     /// Starts recording audio for transcription
     /// - Returns: Success status of recording start
     func startRecording() -> Bool

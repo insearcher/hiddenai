@@ -18,9 +18,13 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     private var audioRecorder: AVAudioRecorder?
     private var recordingURL: URL?
     private var recordingStartTime: Date?
+    private var recordingTimer: Timer?
     
     // Transcription state
     private(set) var isRecording = false
+    
+    // Private backing field for recordingTimeString property
+    private var _recordingTimeString: String = "00:00"
     
     // Dependencies
     private let permissionManager: PermissionManagerProtocol
@@ -73,6 +77,9 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
             return true
         }
         
+        // Make sure any previous timer is stopped first
+        stopTimer()
+        
         // Generate a temporary file URL for the recording using TempFileManager
         recordingURL = TempFileManager.shared.createTempFileURL(prefix: "whisper_recording", extension: "m4a")
         
@@ -101,9 +108,16 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
             if audioRecorder?.record() == true {
                 isRecording = true
                 recordingStartTime = Date()
+                _recordingTimeString = "00:00"
+                
+                // Start a timer to update the recording time
+                startTimer()
                 
                 // Notify that recording has started
-                notificationService.post(name: .whisperRecordingStarted, object: nil)
+                notificationService.post(
+                    name: .whisperRecordingStarted, 
+                    object: ["timeString": _recordingTimeString]
+                )
                 print("Started recording for Whisper transcription")
                 return true
             } else {
@@ -125,6 +139,9 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
             return
         }
         
+        // Always ensure we stop the timer first to prevent timer multiplication
+        stopTimer()
+        
         // Calculate recording duration
         var durationString = "unknown"
         if let startTime = recordingStartTime {
@@ -139,7 +156,10 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
         isRecording = false
         
         // Notify that recording has stopped
-        notificationService.post(name: .whisperRecordingStopped, object: nil)
+        notificationService.post(
+            name: .whisperRecordingStopped, 
+            object: ["finalDuration": durationString]
+        )
         print("Stopped recording for Whisper transcription. Duration: \(durationString)")
         
         // Keep a reference to the file URL
@@ -213,16 +233,66 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
         }
     }
     
-    /// Get the current recording time as a formatted string
+    /// Get the current recording time as a formatted string (implements protocol requirement)
     func recordingTime() -> String {
-        guard let startTime = recordingStartTime, isRecording else { return "00:00" }
+        return recordingTimeString
+    }
+    
+    /// Current recording time as a formatted string (implements protocol property)
+    var recordingTimeString: String {
+        // This just returns the stored property, which is updated by the timer
+        return _recordingTimeString
+    }
+    
+    /// Starts a timer that updates the recording time
+    private func startTimer() {
+        // Stop any existing timer first
+        stopTimer()
+        
+        // Create a new timer on the main thread
+        DispatchQueue.main.async {
+            self.recordingTimer = Timer.scheduledTimer(
+                withTimeInterval: 1.0,
+                repeats: true
+            ) { [weak self] _ in
+                self?.updateRecordingTime()
+            }
+            
+            // Add the timer to the common run loop mode to ensure it fires even during UI events
+            if let timer = self.recordingTimer {
+                RunLoop.main.add(timer, forMode: .common)
+            }
+        }
+    }
+    
+    /// Stops the recording timer
+    private func stopTimer() {
+        DispatchQueue.main.async {
+            self.recordingTimer?.invalidate()
+            self.recordingTimer = nil
+        }
+    }
+    
+    /// Updates the recording time and broadcasts it via notification
+    private func updateRecordingTime() {
+        guard let startTime = recordingStartTime, isRecording else { 
+            _recordingTimeString = "00:00"
+            return
+        }
         
         let currentTime = Date()
         let duration = currentTime.timeIntervalSince(startTime)
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
         
-        return String(format: "%02d:%02d", minutes, seconds)
+        // Update the time string
+        _recordingTimeString = String(format: "%02d:%02d", minutes, seconds)
+        
+        // Broadcast the updated time
+        notificationService.post(
+            name: .whisperRecordingTimeUpdated,
+            object: ["timeString": _recordingTimeString]
+        )
     }
     
     // MARK: - AVAudioRecorderDelegate
@@ -256,6 +326,7 @@ extension Notification.Name {
     static let whisperRecordingStopped = Notification.Name("WhisperRecordingStopped")
     static let whisperTranscriptionReceived = Notification.Name("WhisperTranscriptionReceived")
     static let whisperTranscriptionError = Notification.Name("WhisperTranscriptionError")
+    static let whisperRecordingTimeUpdated = Notification.Name("WhisperRecordingTimeUpdated")
 }
 
 // Import extension for TempFileManager

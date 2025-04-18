@@ -271,9 +271,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
     @objc func toggleWhisperTranscription() {
         print("AppDelegate toggleWhisperTranscription called")
         
+        // Check if we have an API key first
+        if !openAIClient.hasApiKey {
+            // Show error as notification rather than opening settings
+            notificationService.post(
+                name: .openaiError, // Use the correct notification name (lowercase 'i')
+                object: ["error": "OpenAI API key not set. Please configure in settings."]
+            )
+            
+            // Open settings window to prompt for API key
+            DispatchQueue.main.async {
+                self.showSettings()
+            }
+            return
+        }
+        
         // Toggle Whisper recording through the service
-        whisperService.toggleRecording(contextInfo: nil) { _ in
-            // All notification handling is done in the service
+        whisperService.toggleRecording(contextInfo: nil) { result in
+            // Handle any errors by broadcasting a notification
+            if case .failure(let error) = result {
+                self.notificationService.post(
+                    name: .whisperTranscriptionError,
+                    object: ["error": error.localizedDescription]
+                )
+            }
+            // Success handling is done through notifications in the service
         }
     }
     
@@ -407,11 +429,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
     @objc func captureScreenshot(_ notification: Notification? = nil) {
         print("AppDelegate captureScreenshot called")
         
+        // Check if we have an API key first
+        if !openAIClient.hasApiKey {
+            // Show error as notification
+            notificationService.post(
+                name: .openaiError, // Use the correct notification name (lowercase 'i')
+                object: ["error": "OpenAI API key not set. Please configure in settings."]
+            )
+            
+            // Open settings window to prompt for API key
+            DispatchQueue.main.async {
+                self.showSettings()
+            }
+            return
+        }
+        
         // Get context info from notification if available
         var contextInfo: [String: Any]?
         if let notificationObject = notification?.object as? [String: Any] {
             contextInfo = notificationObject
         }
+        
+        // Broadcast that we're starting the screenshot process
+        notificationService.post(name: .screenshotProcessing, object: nil)
         
         // First check if we have screen capture permission
         permissionManager.screenCapturePermissionStatus { [weak self] status in
