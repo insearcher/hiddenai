@@ -32,26 +32,20 @@ struct Message: Identifiable, Equatable {
     let contents: [MessageContent]
     let type: MessageType
     let timestamp: Date
-    let replyToId: UUID?            // ID of the message this is replying to
-    let replyChain: [UUID]          // Chain of message IDs in the reply thread
     
     static func == (lhs: Message, rhs: Message) -> Bool {
         return lhs.id == rhs.id &&
                lhs.contents == rhs.contents &&
                lhs.type == rhs.type &&
-               lhs.timestamp == rhs.timestamp &&
-               lhs.replyToId == rhs.replyToId &&
-               lhs.replyChain == rhs.replyChain
+               lhs.timestamp == rhs.timestamp
     }
     
     // Convenience initializer for backward compatibility
-    init(text: String, type: MessageType, timestamp: Date, replyToId: UUID? = nil, replyChain: [UUID] = []) {
+    init(text: String, type: MessageType, timestamp: Date) {
         // Parse the text for any code blocks
         self.contents = Message.parseTextForCodeBlocks(text)
         self.type = type
         self.timestamp = timestamp
-        self.replyToId = replyToId
-        self.replyChain = replyChain
     }
     
     // Parse text for code blocks using markdown-style triple backtick syntax
@@ -181,10 +175,6 @@ struct ConversationView: View {
     @State private var latestMessageId: UUID?
     @State private var showScrollToButton: Bool = false
     
-    // Reply context tracking
-    @State private var activeReplyId: UUID? = nil
-    @State private var replyChain: [UUID] = []
-    
     // Timer for updating recording time
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
@@ -232,23 +222,7 @@ struct ConversationView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 12) {
                             ForEach(messages) { message in
-                                MessageView(message: message, 
-                                          activeReplyId: $activeReplyId, 
-                                          replyChain: $replyChain,
-                                          onReply: { messageId in
-                                              self.setReplyContext(messageId: messageId)
-                                          },
-                                          onClearReply: {
-                                              self.clearReplyContext()
-                                          },
-                                          onClickReplyContext: { messageId in
-                                              // Handle click on reply context by scrolling to the message
-                                              scrollToMessage(messageId, in: scrollView)
-                                          },
-                                          getContentPreview: { messageId in
-                                              // Get a preview of message content by ID
-                                              self.getMessagePreview(id: messageId)
-                                          })
+                                MessageView(message: message)
                                     .id(message.id)
                                     .onAppear {
                                         // Track when the message becomes visible
@@ -263,66 +237,7 @@ struct ConversationView: View {
                                     }
                             }
                             
-                            // Show active reply indicator if applicable
-                            if let replyId = activeReplyId {
-                                // Look up the message to get a preview
-                                if let replyMsgIndex = messages.firstIndex(where: { $0.id == replyId }),
-                                   let firstContent = messages[replyMsgIndex].contents.first {
-                                    
-                                    // Make the whole row clickable with ZStack for the Clear button
-                                    ZStack(alignment: .trailing) {
-                                        // Main content as a button (entire area clickable)
-                                        Button(action: {
-                                            // Scroll to message when tapped
-                                            scrollToMessage(replyId, in: scrollView)
-                                        }) {
-                                            HStack {
-                                                Image(systemName: "arrowshape.turn.up.left")
-                                                    .font(.system(size: 13))
-                                                    .foregroundColor(JetBrainsTheme.accentPrimary)
-                                                
-                                                // Show real preview of the message
-                                                let content = firstContent.content
-                                                let preview = content.count > 60 ? 
-                                                    String(content.prefix(60)) + "..." : content
-                                                    
-                                                Text(preview)
-                                                    .font(.system(size: 13))
-                                                    .foregroundColor(JetBrainsTheme.accentPrimary)
-                                                    .lineLimit(1)
-                                                
-                                                Spacer()
-                                                
-                                                // Spacer for the clear button
-                                                Text("      ")
-                                                    .opacity(0)
-                                            }
-                                            .contentShape(Rectangle()) // Make entire area clickable
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        
-                                        // Clear button on top
-                                        Button(action: clearReplyContext) {
-                                            Text("Clear")
-                                                .font(.system(size: 12))
-                                                .foregroundColor(JetBrainsTheme.error)
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 4)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .padding(.trailing, 4)
-                                    }
-                                    .padding(8)
-                                    .background(JetBrainsTheme.backgroundTertiary)
-                                    .cornerRadius(6)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(JetBrainsTheme.accentPrimary.opacity(0.4), lineWidth: 1)
-                                    )
-                                    .padding(.vertical, 4)
-                                    .transition(.opacity)
-                                }
-                            }
+                            // Reply functionality has been removed
                             
                             // Show recording status if Whisper is recording
                             if isWhisperRecording {
@@ -644,24 +559,7 @@ struct ConversationView: View {
         isProcessingScreenshot = true
         
         // Request screenshot capture through notification
-        // Include reply context in the notification if available
-        if !replyChain.isEmpty {
-            // Create a notification payload with reply context
-            var contextInfo: [String: Any] = [:]
-            
-            // Add message IDs
-            contextInfo["replyChain"] = replyChain
-            contextInfo["replyToId"] = activeReplyId
-            
-            // Post with context
-            NotificationCenter.default.post(
-                name: .captureScreenshotRequested, 
-                object: contextInfo
-            )
-        } else {
-            // Post without context
-            NotificationCenter.default.post(name: .captureScreenshotRequested, object: nil)
-        }
+        NotificationCenter.default.post(name: .captureScreenshotRequested, object: nil)
         
         // Add a message to indicate we're processing
         addMessage("Capturing and analyzing screenshot...", type: .user)
@@ -775,19 +673,6 @@ struct ConversationView: View {
                let transcript = userInfo["transcript"] as? String,
                !transcript.isEmpty {
                 
-                // Check if there's reply context in the notification
-                if let replyChainData = userInfo["replyChain"] as? [UUID],
-                   !replyChainData.isEmpty {
-                    
-                    // Set the reply context
-                    self.replyChain = replyChainData
-                    
-                    // Set the active reply ID if available
-                    if let replyToId = userInfo["replyToId"] as? UUID {
-                        self.activeReplyId = replyToId
-                    }
-                }
-                
                 // Process the transcription just like any other user input
                 processTranscription(transcript)
             }
@@ -863,30 +748,10 @@ struct ConversationView: View {
         }
         
         // Toggle recording with Whisper service
-        // Include reply context if available
-        if !replyChain.isEmpty {
-            // Create a context object
-            var contextInfo: [String: Any] = [:]
-            
-            // Add message IDs
-            contextInfo["replyChain"] = replyChain
-            contextInfo["replyToId"] = activeReplyId
-            
-            // Toggle with context
-            WhisperTranscriptionService.shared.toggleRecording(contextInfo: contextInfo) { result in
-                if case .failure(let error) = result {
-                    DispatchQueue.main.async {
-                        addMessage("Error: \(error.localizedDescription)", type: .assistant)
-                    }
-                }
-            }
-        } else {
-            // Toggle without context
-            WhisperTranscriptionService.shared.toggleRecording { result in
-                if case .failure(let error) = result {
-                    DispatchQueue.main.async {
-                        addMessage("Error: \(error.localizedDescription)", type: .assistant)
-                    }
+        WhisperTranscriptionService.shared.toggleRecording { result in
+            if case .failure(let error) = result {
+                DispatchQueue.main.async {
+                    addMessage("Error: \(error.localizedDescription)", type: .assistant)
                 }
             }
         }
@@ -906,46 +771,18 @@ struct ConversationView: View {
         if OpenAIClient.shared.hasApiKey {
             isProcessing = true
             
-            // Check if we have an active reply context
-            if !replyChain.isEmpty {
-                // Build an array of context messages in the right order
-                var contextMessages: [Message] = []
-                
-                // Get all messages in the reply chain
-                for messageId in replyChain {
-                    if let messageIndex = messages.firstIndex(where: { $0.id == messageId }) {
-                        contextMessages.append(messages[messageIndex])
+            // Send a regular request - no reply context needed
+            OpenAIClient.shared.sendRequest(prompt: text) { result in
+                // Only handle failures in the completion handler
+                // Success responses are handled by the notification observer
+                if case .failure(let error) = result {
+                    DispatchQueue.main.async {
+                        addMessage("Error: \(error.localizedDescription)", type: .assistant)
+                        self.isProcessing = false
                     }
                 }
-                
-                // Send request with context
-                OpenAIClient.shared.sendRequestWithContext(
-                    prompt: text,
-                    contextMessages: contextMessages
-                ) { result in
-                    // Only handle failures in the completion handler
-                    // Success responses are handled by the notification observer
-                    if case .failure(let error) = result {
-                        DispatchQueue.main.async {
-                            addMessage("Error: \(error.localizedDescription)", type: .assistant)
-                            self.isProcessing = false
-                        }
-                    }
-                }
-            } else {
-                // No context, send a regular request
-                OpenAIClient.shared.sendRequest(prompt: text) { result in
-                    // Only handle failures in the completion handler
-                    // Success responses are handled by the notification observer
-                    if case .failure(let error) = result {
-                        DispatchQueue.main.async {
-                            addMessage("Error: \(error.localizedDescription)", type: .assistant)
-                            self.isProcessing = false
-                        }
-                    }
-                    // We don't set isProcessing = false for success case 
-                    // as the notification handler will do that
-                }
+                // We don't set isProcessing = false for success case 
+                // as the notification handler will do that
             }
         } else {
             addMessage("Please set your OpenAI API key in settings to receive responses.", type: .assistant)
@@ -957,9 +794,7 @@ struct ConversationView: View {
         let message = Message(
             text: text, 
             type: type, 
-            timestamp: Date(),
-            replyToId: activeReplyId,
-            replyChain: replyChain
+            timestamp: Date()
         )
         messages.append(message)
         
@@ -971,106 +806,9 @@ struct ConversationView: View {
         if type == .user {
             scrollToBottom = true
         }
-        
-        // Clear reply context after sending a message
-        if activeReplyId != nil {
-            clearReplyContext()
-        }
     }
     
-    /// Set up the reply context for a message
-    private func setReplyContext(messageId: UUID) {
-        // Find the message we're replying to
-        guard let replyToIndex = messages.firstIndex(where: { $0.id == messageId }) else {
-            return
-        }
-        
-        let replyToMessage = messages[replyToIndex]
-        
-        // Set the active reply ID
-        activeReplyId = messageId
-        
-        // Build the reply chain
-        var newReplyChain = replyToMessage.replyChain
-        
-        // If the message already has a reply chain, continue it
-        if !newReplyChain.isEmpty {
-            // Add the current message ID to the chain
-            newReplyChain.append(messageId)
-        } else {
-            // Start a new chain with just this message
-            newReplyChain = [messageId]
-        }
-        
-        // If we're replying to an AI message, also include the question that prompted it
-        if replyToMessage.type == .assistant, let replyToId = replyToMessage.replyToId {
-            // Find the user message that prompted this assistant response
-            if !newReplyChain.contains(replyToId) {
-                // Add the user message ID to the beginning of the chain
-                newReplyChain.insert(replyToId, at: 0)
-            }
-        }
-        
-        // If we're replying to a user message, also include any AI responses to it
-        if replyToMessage.type == .user {
-            // Find all AI responses to this user message
-            for (index, message) in messages.enumerated() {
-                if message.type == .assistant && 
-                   message.replyToId == messageId && 
-                   !newReplyChain.contains(message.id) {
-                    // Add the AI response to the chain
-                    newReplyChain.append(message.id)
-                    break // Only include the first AI response for now
-                }
-            }
-        }
-        
-        // Set the reply chain
-        replyChain = newReplyChain
-        
-        // Scroll to the message being replied to for context
-        // (after a slight delay to ensure UI updates)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            withAnimation {
-                if let scrollView = findScrollView() {
-                    scrollView.scrollTo(messageId, anchor: .center)
-                }
-            }
-        }
-    }
-    
-    /// Clear the current reply context
-    private func clearReplyContext() {
-        withAnimation {
-            activeReplyId = nil
-            replyChain = []
-        }
-    }
-    
-    /// Helper to find the ScrollView for programmatic scrolling
-    private func findScrollView() -> ScrollViewProxy? {
-        // This is a placeholder since we can't actually get the ScrollViewProxy directly
-        // We'll handle scrolling in our existing ScrollViewReader
-        return nil
-    }
-    
-    /// Helper to get a string preview of a message by its ID
-    private func getMessagePreview(id: UUID, maxLength: Int = 50) -> String {
-        // Find the message in the conversation
-        if let messageIndex = messages.firstIndex(where: { $0.id == id }) {
-            // Get the first content part as preview
-            if let firstContent = messages[messageIndex].contents.first {
-                let content = firstContent.content
-                // Limit the preview length
-                if content.count > maxLength {
-                    return String(content.prefix(maxLength)) + "..."
-                } else {
-                    return content
-                }
-            }
-        }
-        return "Message"
-    }
+    // Reply functionality has been removed
     
     /// Scroll to a specific message using the provided ScrollViewProxy
     private func scrollToMessage(_ id: UUID, in scrollView: ScrollViewProxy) {
@@ -1101,180 +839,121 @@ struct ConversationView: View {
 
 struct MessageView: View {
     let message: Message
-    @Binding var activeReplyId: UUID?
-    @Binding var replyChain: [UUID]
-    let onReply: (UUID) -> Void
-    let onClearReply: () -> Void
-    let onClickReplyContext: (UUID) -> Void
-    
-    // The messages array is needed for context previews
-    let getContentPreview: (UUID) -> String
-    
     @State private var copiedIndex: Int? = nil
-    @State private var showContextMenu = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            // No longer showing any indicator on the message being replied to
-            // to avoid duplication and visual clutter
-            
-            // Show a preview if this message is part of a reply chain
-            if !message.replyChain.isEmpty && !message.replyChain.contains(where: { $0 == activeReplyId }) {
-                ForEach(message.replyChain.prefix(1), id: \.self) { replyId in
-                    Button(action: {
-                        // Focus on the referenced message when clicked
-                        onClickReplyContext(replyId)
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.turn.up.left")
-                                .font(.system(size: 10))
-                                .foregroundColor(JetBrainsTheme.textSecondary)
-                            
-                            Text(getContextMessagePreview(replyId, maxLength: 40))
-                                .font(.system(size: 10))
-                                .foregroundColor(JetBrainsTheme.textSecondary)
-                                .lineLimit(1)
-                            
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(JetBrainsTheme.backgroundTertiary)
-                        .cornerRadius(4)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.bottom, 4)
-                }
+        HStack {
+            if message.type == .assistant {
+                Spacer(minLength: 30)
             }
             
-            HStack {
-                if message.type == .assistant {
-                    Spacer(minLength: 30)
-                }
-                
-                VStack(alignment: message.type == .user ? .leading : .trailing, spacing: 4) {
-                    VStack(alignment: message.type == .user ? .leading : .trailing, spacing: 10) { // Increased spacing between blocks in a message
-                    ForEach(Array(message.contents.enumerated()), id: \.offset) { index, content in
-                        switch content.type {
-                        case .text:
-                            Text(content.content)
-                                .font(.system(size: 14))
-                                .padding(10) // Reduced padding
-                                .fixedSize(horizontal: false, vertical: true) // Proper wrapping
-                                .background(message.type == .user ? JetBrainsTheme.userMessage : JetBrainsTheme.assistantMessage)
-                                .foregroundColor(JetBrainsTheme.textPrimary)
-                                .cornerRadius(6)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(
-                                            message.type == .user ? 
-                                                JetBrainsTheme.accentPrimary.opacity(0.3) : 
-                                                JetBrainsTheme.accentSecondary.opacity(0.3),
-                                            lineWidth: 1
-                                        )
-                                )
-                        
-                        case .code(let language):
-                            VStack(alignment: .leading, spacing: 0) {
-                                // Code header with language label and copy button
-                                HStack {
-                                    Text(language)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .padding(.horizontal, 8) // Reduced padding
-                                        .padding(.vertical, 3)   // Reduced padding
-                                        .foregroundColor(JetBrainsTheme.textPrimary)
-                                    
-                                    Spacer()
-                                    
-                                    Button(action: {
-                                        copyToClipboard(content.content)
-                                        copiedIndex = index
-                                        
-                                        // Reset "Copied" text after 2 seconds
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                            copiedIndex = nil
-                                        }
-                                    }) {
-                                        HStack(spacing: 3) { // Reduced spacing
-                                            Image(systemName: copiedIndex == index ? "checkmark" : "doc.on.doc")
-                                                .font(.system(size: 11)) // Smaller icon
-                                            
-                                            Text(copiedIndex == index ? "Copied!" : "Copy")
-                                                .font(.system(size: 11)) // Smaller text
-                                        }
-                                        .foregroundColor(JetBrainsTheme.textPrimary)
-                                        .padding(.horizontal, 6) // Reduced padding
-                                        .padding(.vertical, 3)   // Reduced padding
-                                        .background(JetBrainsTheme.backgroundTertiary)
-                                        .cornerRadius(4)
-                                    }
-                                    .buttonStyle(BorderlessButtonStyle())
-                                }
-                                .padding(.horizontal, 8) // Reduced padding
-                                .padding(.vertical, 4)   // Reduced padding
-                                .background(JetBrainsTheme.backgroundSecondary)
-                                .clipShape(RoundedCorner(radius: 6, corners: [.topLeft, .topRight]))
+            VStack(alignment: message.type == .user ? .leading : .trailing, spacing: 4) {
+                VStack(alignment: message.type == .user ? .leading : .trailing, spacing: 10) { // Increased spacing between blocks in a message
+                ForEach(Array(message.contents.enumerated()), id: \.offset) { index, content in
+                    switch content.type {
+                    case .text:
+                        Text(content.content)
+                            .font(.system(size: 14))
+                            .padding(10) // Reduced padding
+                            .fixedSize(horizontal: false, vertical: true) // Proper wrapping
+                            .background(message.type == .user ? JetBrainsTheme.userMessage : JetBrainsTheme.assistantMessage)
+                            .foregroundColor(JetBrainsTheme.textPrimary)
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(
+                                        message.type == .user ? 
+                                            JetBrainsTheme.accentPrimary.opacity(0.3) : 
+                                            JetBrainsTheme.accentSecondary.opacity(0.3),
+                                        lineWidth: 1
+                                    )
+                            )
+                    
+                    case .code(let language):
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Code header with language label and copy button
+                            HStack {
+                                Text(language)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .padding(.horizontal, 8) // Reduced padding
+                                    .padding(.vertical, 3)   // Reduced padding
+                                    .foregroundColor(JetBrainsTheme.textPrimary)
                                 
-                                // Code content with syntax highlighting
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    Text(CodeHighlighter.highlightCode(content.content, language: language))
-                                        .font(.system(size: 13, design: .monospaced))
-                                        .lineSpacing(1) // Reduced line spacing
-                                        .padding(8)      // Reduced padding
-                                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                                Spacer()
+                                
+                                Button(action: {
+                                    copyToClipboard(content.content)
+                                    copiedIndex = index
+                                    
+                                    // Reset "Copied" text after 2 seconds
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                        copiedIndex = nil
+                                    }
+                                }) {
+                                    HStack(spacing: 3) { // Reduced spacing
+                                        Image(systemName: copiedIndex == index ? "checkmark" : "doc.on.doc")
+                                            .font(.system(size: 11)) // Smaller icon
+                                        
+                                        Text(copiedIndex == index ? "Copied!" : "Copy")
+                                            .font(.system(size: 11)) // Smaller text
+                                    }
+                                    .foregroundColor(JetBrainsTheme.textPrimary)
+                                    .padding(.horizontal, 6) // Reduced padding
+                                    .padding(.vertical, 3)   // Reduced padding
+                                    .background(JetBrainsTheme.backgroundTertiary)
+                                    .cornerRadius(4)
                                 }
-                                .background(JetBrainsTheme.codeBackground)
-                                .clipShape(RoundedCorner(radius: 6, corners: [.bottomLeft, .bottomRight]))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(JetBrainsTheme.border, lineWidth: 1)
-                                        .clipShape(RoundedCorner(radius: 6, corners: [.bottomLeft, .bottomRight]))
-                                )
+                                .buttonStyle(BorderlessButtonStyle())
                             }
-                            .frame(maxWidth: 500, alignment: message.type == .user ? .leading : .trailing)
+                            .padding(.horizontal, 8) // Reduced padding
+                            .padding(.vertical, 4)   // Reduced padding
+                            .background(JetBrainsTheme.backgroundSecondary)
+                            .clipShape(RoundedCorner(radius: 6, corners: [.topLeft, .topRight]))
+                            
+                            // Code content with syntax highlighting
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                Text(CodeHighlighter.highlightCode(content.content, language: language))
+                                    .font(.system(size: 13, design: .monospaced))
+                                    .lineSpacing(1) // Reduced line spacing
+                                    .padding(8)      // Reduced padding
+                                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                            }
+                            .background(JetBrainsTheme.codeBackground)
+                            .clipShape(RoundedCorner(radius: 6, corners: [.bottomLeft, .bottomRight]))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
                                     .stroke(JetBrainsTheme.border, lineWidth: 1)
+                                    .clipShape(RoundedCorner(radius: 6, corners: [.bottomLeft, .bottomRight]))
                             )
-                            // Regular spacing between content blocks
-                            .padding(.bottom, 2)
                         }
+                        .frame(maxWidth: 500, alignment: message.type == .user ? .leading : .trailing)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(JetBrainsTheme.border, lineWidth: 1)
+                        )
+                        // Regular spacing between content blocks
+                        .padding(.bottom, 2)
                     }
                 }
-                
-                Text(formattedTime(for: message.timestamp))
-                    .font(.system(size: 11))
-                    .foregroundColor(JetBrainsTheme.textSecondary)
-                    .padding(.horizontal, 5)
             }
             
-            if message.type == .user {
-                Spacer(minLength: 30)
-            }
+            Text(formattedTime(for: message.timestamp))
+                .font(.system(size: 11))
+                .foregroundColor(JetBrainsTheme.textSecondary)
+                .padding(.horizontal, 5)
         }
+        
+        if message.type == .user {
+            Spacer(minLength: 30)
+        }
+    }
         .contextMenu {
-            Button(action: {
-                onReply(message.id)
-            }) {
-                Label("Reply", systemImage: "arrowshape.turn.up.left")
-            }
-            
             // Add copy button for the entire message
             Button(action: {
                 copyMessageContent()
             }) {
                 Label("Copy Message", systemImage: "doc.on.doc")
             }
-            
-            if activeReplyId != nil {
-                Button(action: {
-                    onClearReply()
-                }) {
-                    Label("Clear Reply", systemImage: "xmark.circle")
-                }
-            }
-        }
         }
     }
     
@@ -1302,22 +981,6 @@ struct MessageView: View {
         }.joined(separator: "\n\n")
         
         copyToClipboard(fullText)
-    }
-    
-    // Use provided function to get preview
-    private func getMessagePreview(id: UUID, maxLength: Int = 50) -> String {
-        return getContentPreview(id)
-    }
-    
-    // Helper to handle click on reply context
-    private func handleReplyContextClick(_ messageId: UUID) {
-        // Delegate to the parent view through callback
-        onClickReplyContext(messageId)
-    }
-    
-    // Use provided function to get preview
-    private func getContextMessagePreview(_ messageId: UUID, maxLength: Int = 50) -> String {
-        return getContentPreview(messageId)
     }
 }
 
