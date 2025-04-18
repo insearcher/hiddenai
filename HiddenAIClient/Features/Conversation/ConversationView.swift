@@ -686,7 +686,14 @@ struct ConversationView: View {
             object: nil,
             queue: .main
         ) { _ in
-            // Processing notification
+            // Update UI state in addition to just logging
+            self.isProcessingScreenshot = true
+            
+            // Optionally add the processing message if it doesn't exist yet
+            if !self.messages.contains(where: { $0.contents.first?.content.contains("Capturing and analyzing screenshot") == true }) {
+                self.addMessage("Capturing and analyzing screenshot...", type: .user)
+            }
+            
             print("Screenshot is being processed by OpenAI")
         }
         
