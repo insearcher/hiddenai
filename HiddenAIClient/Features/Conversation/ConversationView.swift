@@ -160,7 +160,6 @@ struct ConversationView: View {
     @State private var inputText: String = ""
     @FocusState private var isInputFocused: Bool
     
-    // Authentication removed for open source version
     
     // New state for Whisper transcription
     @State private var isWhisperRecording: Bool = false

@@ -354,12 +354,7 @@ class WindowManager: NSObject, WindowManagerProtocol {
         return false
     }
     
-    // Alternative approach for key handling if needed in the future
-    func setupAlternativeKeyHandling() {
-        // This method can be implemented if the current key handling isn't working
-        print("Alternative key handling would be setup here")
-    }
-    
+
     // Apply basic security settings to a window
     private func applyBasicSecurity(to window: NSWindow) {
         // Apply essential security techniques individually

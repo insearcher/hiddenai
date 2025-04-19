@@ -7,7 +7,6 @@
 
 import Foundation
 import AVFoundation
-import Speech
 import AppKit
 import ScreenCaptureKit
 // Import for centralized notification handling

@@ -72,7 +72,7 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
     /// Take a screenshot of the screen, hiding the app's window
     /// - Returns: Boolean indicating success
     func captureScreenshot(contextInfo: [String: Any]? = nil) -> Bool {
-        print("DEBUG: captureScreenshot called")
+        
         
         // If contextInfo is provided, store it
         if let contextInfo = contextInfo {
@@ -87,24 +87,24 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
             // Try to get from DI container first
             if let appDelegate = DIContainer.shared.resolve(AppDelegateProtocol.self) {
                 self.appDelegate = appDelegate
-                print("DEBUG: Retrieved AppDelegate from DI container")
+                
             } else if let appDelegate = NSApp.delegate as? AppDelegateProtocol {
                 // Fallback to NSApp.delegate but using protocol
                 self.appDelegate = appDelegate
-                print("DEBUG: Retrieved AppDelegate from NSApp.delegate")
+                
             }
         }
         
         // Check if we have an appDelegate
         guard let appDelegate = self.appDelegate else {
             postScreenshotError("App delegate not available")
-            print("DEBUG: AppDelegate reference is nil, could not recover from any source")
+            
             return false
         }
         
         // Skip permission check since it seems unreliable
         // We'll just try the capture directly and let the system handle permission requests
-        print("DEBUG: Taking screenshot with fallback method first")
+        
         
         // Let user know we're processing
         notificationService.post(
@@ -117,18 +117,18 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
         var capturedImage: NSImage? = nil
         
         // First try with direct ScreenCaptureKit - this is preferable but sometimes has permission issues
-        print("DEBUG: Trying SCKit first...")
+        
         if let screenshot = captureScreen() {
-            print("DEBUG: Screenshot captured successfully with SCKit, processing...")
+            
             captureSuccess = true
             capturedImage = screenshot
         }
         
         // If SCKit fails, try command-line
         if !captureSuccess {
-            print("DEBUG: SCKit failed, trying command-line method...")
+            
             if let screenshot = captureScreenWithNSBitmapImageRep() {
-                print("DEBUG: Screenshot captured successfully with command-line method, processing...")
+                
                 captureSuccess = true
                 capturedImage = screenshot
             }
@@ -136,11 +136,11 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
         
         // Process the screenshot if we have one
         if let finalImage = capturedImage {
-            print("DEBUG: Screenshot captured successfully, processing...")
+            
             processScreenshot(finalImage)
             return true
         } else {
-            print("DEBUG: All screenshot capture methods failed")
+            
             postScreenshotError("Failed to capture screenshot with all methods")
             return false
         }
@@ -151,12 +151,12 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
     private func captureScreen() -> NSImage? {
         // Try first with a simple method as fallback
         if let image = captureScreenWithNSBitmapImageRep() {
-            print("DEBUG: Used NSBitmapImageRep fallback method")
+            
             return image
         }
         
-        print("DEBUG: NSBitmapImageRep fallback failed, trying SCKit...")
-        print("DEBUG: Starting screen capture process")
+        
+        
         
         // Use a semaphore to make the async capture synchronous for our method
         let semaphore = DispatchSemaphore(value: 0)
@@ -165,29 +165,29 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
         // Capture the screenshot on a background queue
         Task {
             do {
-                print("DEBUG: Requesting SCShareableContent.current")
+                
                 // Get available content and filter to show only screen content
                 let availableContent = try await SCShareableContent.current
-                print("DEBUG: Got SCShareableContent with \(availableContent.displays.count) displays and \(availableContent.windows.count) windows")
+                
                 
                 // Filter out our app's window to avoid capturing it
                 let contentToExclude = availableContent.windows.filter { window in
                     let isOurApp = window.owningApplication?.bundleIdentifier == Bundle.main.bundleIdentifier
                     if isOurApp {
-                        print("DEBUG: Found our app window to exclude: \(window.title)")
+                        
                     }
                     return isOurApp
                 }
-                print("DEBUG: Excluding \(contentToExclude.count) windows from capture")
+                
                 
                 // Configure the capture with the main display
                 guard let mainDisplay = availableContent.displays.first else {
-                    print("DEBUG: ERROR - No display found!")
+                    
                     semaphore.signal()
                     return
                 }
                 
-                print("DEBUG: Using display: \(mainDisplay.width)x\(mainDisplay.height)")
+                
                 
                 let configuration = SCStreamConfiguration()
                 configuration.width = mainDisplay.width
@@ -201,60 +201,60 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
                     excludingWindows: contentToExclude
                 )
                 
-                print("DEBUG: Creating stream with filter")
+                
                 // Create the stream
                 let stream = SCStream(filter: filter, configuration: configuration, delegate: nil)
                 
-                print("DEBUG: Adding stream output")
+                
                 // Add a stream output to capture frames
                 try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
                 
-                print("DEBUG: Starting stream capture")
+                
                 // Start the stream - add await here
                 try await stream.startCapture()
-                print("DEBUG: Stream capture started")
+                
                 
                 // Wait longer to capture a frame
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { // Increased timeout further
-                    print("DEBUG: Stopping stream capture")
+                    
                     // Stop the stream after capturing the frame
                     Task {
                         do {
                             try await stream.stopCapture()
-                            print("DEBUG: Stream capture stopped successfully")
+                            
                         } catch {
-                            print("DEBUG: Error stopping capture: \(error.localizedDescription)")
+                            
                         }
                         
                         // If we didn't get an image by now, signal to continue
                         if capturedImage == nil {
-                            print("DEBUG: No image captured, signaling to continue")
+                            
                             semaphore.signal()
                         }
                     }
                 }
             } catch {
-                print("DEBUG: Error setting up screen capture: \(error.localizedDescription)")
+                
                 semaphore.signal()
             }
         }
         
-        print("DEBUG: Setting up capture handler")
+        
         // Store captured image from stream output handler
         self.captureHandler = { image in
-            print("DEBUG: Capture handler called with image")
+            
             capturedImage = image
             semaphore.signal()
         }
         
-        print("DEBUG: Waiting for capture to complete (timeout: 6.0 seconds)")
+        
         // Increase timeout to wait for capture to complete
         _ = semaphore.wait(timeout: .now() + 6.0)
         
         if capturedImage == nil {
-            print("DEBUG: Capture timed out - no image received")
+            
         } else {
-            print("DEBUG: Successfully captured screenshot")
+            
         }
         
         self.captureHandler = nil
@@ -374,50 +374,50 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
     // MARK: - SCStreamOutput Implementation
     
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        print("DEBUG: Stream output callback received. Type: \(type)")
+        
         
         // Only process screen content (not audio)
         guard type == .screen else {
-            print("DEBUG: Ignoring non-screen sample buffer")
+            
             return
         }
         
         // Check if we have a valid pixel buffer
         guard let imageBuffer = sampleBuffer.imageBuffer else {
-            print("DEBUG: No image buffer in sample buffer")
+            
             return
         }
         
-        print("DEBUG: Got image buffer: \(CVPixelBufferGetWidth(imageBuffer))x\(CVPixelBufferGetHeight(imageBuffer))")
+        
         
         // Create a CIImage from the pixel buffer
         let ciImage = CIImage(cvPixelBuffer: imageBuffer)
-        print("DEBUG: Created CIImage: \(ciImage.extent.width)x\(ciImage.extent.height)")
+        
         
         // Convert to CGImage
         let context = CIContext()
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
-            print("DEBUG: Failed to create CGImage from CIImage")
+            
             return
         }
         
-        print("DEBUG: Created CGImage: \(cgImage.width)x\(cgImage.height)")
+        
         
         // Create NSImage from CGImage
         let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-        print("DEBUG: Created NSImage: \(image.size.width)x\(image.size.height)")
+        
         
         // Call the capture handler
         DispatchQueue.main.async {
-            print("DEBUG: Calling capture handler on main thread")
+            
             self.captureHandler?(image)
-            print("DEBUG: Capture handler called")
+            
         }
     }
     
     /// Fallback method to capture screen using NSScreen
     private func captureScreenWithNSBitmapImageRep() -> NSImage? {
-        print("DEBUG: Trying to capture screen with AppKit")
+        
         
         // Use Process to run screencapture CLI tool, which is more reliable
         let task = Process()
@@ -430,7 +430,7 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
         // -x: no sound (silent capture)
         task.arguments = ["-x", tempURL.path]
         
-        print("DEBUG: Will save temp screenshot to: \(tempURL.path)")
+        
         
         do {
             // Run the screencapture command
@@ -444,20 +444,20 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
                 
                 // Load the image from the temp file
                 if let image = NSImage(contentsOf: tempURL) {
-                    print("DEBUG: Successfully loaded screenshot from temp file: \(image.size.width)x\(image.size.height)")
+                    
                     
                     // Clean up the temp file
                     try? FileManager.default.removeItem(at: tempURL)
                     
                     return image
                 } else {
-                    print("DEBUG: Failed to load image from temp file")
+                    
                 }
             } else {
-                print("DEBUG: screencapture command failed with status: \(task.terminationStatus)")
+                
             }
         } catch {
-            print("DEBUG: Error running screencapture: \(error.localizedDescription)")
+            
         }
         
         return nil
