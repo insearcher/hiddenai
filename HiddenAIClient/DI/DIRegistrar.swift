@@ -3,6 +3,7 @@
 //  HiddenWindowMCP
 //
 //  Created on 4/11/25.
+//  Updated on 4/20/25 to support refactored ConversationView
 //
 
 import Foundation
@@ -90,6 +91,14 @@ class DIRegistrar {
         )
         container.registerSingleton(WindowManagerProtocol.self, instance: windowManager)
         
+        // ConversationViewModel - register as singleton to preserve state
+        let conversationViewModel = ConversationViewModel(
+            openAIClient: openAIClient,
+            whisperService: whisperService, 
+            notificationService: notificationService
+        )
+        container.registerSingleton(ConversationViewModel.self, instance: conversationViewModel)
+        
         // Register the AppDelegate as a singleton once it's created
         // This will be done in the HiddenAIClientApp.swift
         
@@ -106,7 +115,9 @@ class DIRegistrar {
 class ViewFactory {
     /// Create a conversation view with dependencies
     func makeConversationView() -> some View {
+        let viewModel = DIContainer.shared.resolve(ConversationViewModel.self)!
         return ConversationView()
+            .environmentObject(viewModel)
     }
     
     /// Create a settings view with dependencies
