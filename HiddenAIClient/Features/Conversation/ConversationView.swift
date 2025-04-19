@@ -852,12 +852,11 @@ struct MessageView: View {
                 ForEach(Array(message.contents.enumerated()), id: \.offset) { index, content in
                     switch content.type {
                     case .text:
-                        Text(content.content)
+                        Text(attributedString: MarkdownParser.parse(text: content.content))
                             .font(.system(size: 14))
-                            .padding(10) // Reduced padding
+                            .padding(10)
                             .fixedSize(horizontal: false, vertical: true) // Proper wrapping
                             .background(message.type == .user ? JetBrainsTheme.userMessage : JetBrainsTheme.assistantMessage)
-                            .foregroundColor(JetBrainsTheme.textPrimary)
                             .cornerRadius(6)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
@@ -868,6 +867,7 @@ struct MessageView: View {
                                         lineWidth: 1
                                     )
                             )
+                            .textSelection(.enabled) // Enable text selection
                     
                     case .code(let language):
                         VStack(alignment: .leading, spacing: 0) {
