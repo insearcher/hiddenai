@@ -17,6 +17,9 @@ class SettingsManager: SettingsManagerProtocol {
         // model key removed - only using GPT-4o now
         static let windowTransparency = "window_transparency"
         static let position = "user_position"
+        static let voiceContext = "voice_context"
+        static let screenshotContext = "screenshot_context" 
+        static let textContext = "text_context"
     }
     
     // Notification service for dependency injection
@@ -65,8 +68,9 @@ class SettingsManager: SettingsManagerProtocol {
         }
     }
     
-    // MARK: - Position Settings
+    // MARK: - Context Settings
     
+    // Global/default context for all interactions
     var position: String {
         get {
             // If no custom context is set, provide a helpful default for first-time users
@@ -82,6 +86,61 @@ class SettingsManager: SettingsManagerProtocol {
         }
     }
     
+    // Voice/Whisper-specific context
+    var voiceContext: String {
+        get {
+            // If not set, provide a voice-specific default
+            let defaultVoiceContext = "You are responding to transcribed voice input. Prioritize concise responses. " +
+                                     "Be forgiving of transcription errors and unclear phrases."
+            
+            return UserDefaults.standard.string(forKey: Keys.voiceContext) ?? defaultVoiceContext
+        }
+        set {
+            // Enforce character limit
+            let limitedValue = String(newValue.prefix(1000))
+            UserDefaults.standard.set(limitedValue, forKey: Keys.voiceContext)
+        }
+    }
+    
+    // Screenshot-specific context
+    var screenshotContext: String {
+        get {
+            // If not set, provide a screenshot-specific default that includes the enhanced coding focus
+            let defaultScreenshotContext = """
+            You are a highly skilled assistant analyzing images and screenshots. When analyzing images, you specialize in:
+            1. Recognizing programming problems, code, and technical content
+            2. Providing complete, working solutions to coding problems
+            3. Explaining algorithms and their time/space complexity
+            4. Offering code implementations in the appropriate language
+            
+            When you see a programming problem, provide the full solution code with explanations, not just a description of what's in the image. Always include the optimal solution and its time/space complexity analysis.
+            """
+            
+            return UserDefaults.standard.string(forKey: Keys.screenshotContext) ?? defaultScreenshotContext
+        }
+        set {
+            // Enforce character limit
+            let limitedValue = String(newValue.prefix(1500)) // Allow slightly longer for screenshot context
+            UserDefaults.standard.set(limitedValue, forKey: Keys.screenshotContext)
+        }
+    }
+    
+    // Text input-specific context
+    var textContext: String {
+        get {
+            // If not set, provide a text-specific default
+            let defaultTextContext = "You are responding to text input in a conversation. " +
+                                    "Provide helpful, concise answers based on the user's query."
+            
+            return UserDefaults.standard.string(forKey: Keys.textContext) ?? defaultTextContext
+        }
+        set {
+            // Enforce character limit
+            let limitedValue = String(newValue.prefix(1000))
+            UserDefaults.standard.set(limitedValue, forKey: Keys.textContext)
+        }
+    }
+    
     // MARK: - Reset Settings
     
     func resetAll() {
@@ -89,5 +148,8 @@ class SettingsManager: SettingsManagerProtocol {
         // Model key removed since we're only using GPT-4o
         UserDefaults.standard.removeObject(forKey: Keys.windowTransparency)
         UserDefaults.standard.removeObject(forKey: Keys.position)
+        UserDefaults.standard.removeObject(forKey: Keys.voiceContext)
+        UserDefaults.standard.removeObject(forKey: Keys.screenshotContext)
+        UserDefaults.standard.removeObject(forKey: Keys.textContext)
     }
 }

@@ -62,18 +62,21 @@ class OpenAIClient: OpenAIClientProtocol {
     
     // Helper method to create the system context message
     private func createSystemContext(questionType: String) -> String {
-        // Get the user-defined context from settings
-        let userContext = settingsManager.position
-        
-        // For different input types, add specific instructions
+        // Select the appropriate context based on the input type
         let contextPrompt: String
         switch questionType {
         case "screenshot":
-            contextPrompt = userContext + "\n\nThe user has shared a screenshot. Analyze the screenshot and provide helpful information based on what you see."
-        case "text", "whisper":
-            contextPrompt = userContext
+            // Use the screenshot-specific context
+            contextPrompt = settingsManager.screenshotContext
+        case "whisper":
+            // Use the voice-specific context
+            contextPrompt = settingsManager.voiceContext
+        case "text":
+            // Use the text-specific context
+            contextPrompt = settingsManager.textContext
         default:
-            contextPrompt = userContext
+            // Fallback to the general context for any other type
+            contextPrompt = settingsManager.position
         }
         
         return contextPrompt
@@ -545,18 +548,10 @@ class OpenAIClient: OpenAIClientProtocol {
             // Create local messages array for this request
             var requestMessages: [[String: Any]] = []
             
-            // Start with system message that's optimized for coding problems
+            // Use the screenshot context from settings
             requestMessages.append([
                 "role": "system", 
-                "content": """
-                You are a highly skilled programming assistant. When analyzing images, you specialize in:
-                1. Recognizing programming problems, code, and technical content
-                2. Providing complete, working solutions to coding problems
-                3. Explaining algorithms and their time/space complexity
-                4. Offering code implementations in the appropriate language
-                
-                When you see a programming problem, provide the full solution code with explanations, not just a description of what's in the image. Always include the optimal solution and its time/space complexity analysis.
-                """
+                "content": settingsManager.screenshotContext
             ])
             
             // Add context messages if available

@@ -116,7 +116,11 @@ struct SettingsView: View {
     @State private var apiKey: String = SettingsManager.shared.apiKey
     @State private var windowTransparency: Double = SettingsManager.shared.windowTransparency
     @State private var position: String = SettingsManager.shared.position
+    @State private var voiceContext: String = SettingsManager.shared.voiceContext
+    @State private var screenshotContext: String = SettingsManager.shared.screenshotContext
+    @State private var textContext: String = SettingsManager.shared.textContext
     @State private var showSavedMessage = false
+    @State private var selectedContextTab = 0 // To control the tab selection
     
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
@@ -168,62 +172,212 @@ struct SettingsView: View {
             // Features section with speech recognition toggles removed - now only using Whisper
             
             VStack(alignment: .leading, spacing: 10) {
-                Text("AI Conversation Context")
+                Text("AI Conversation Contexts")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundColor(JetBrainsTheme.textPrimary)
                 
-                TextEditor(text: $position)
-                    .font(.system(size: 14))
-                    .padding(10)
-                    .frame(height: 180) // Increased height for larger context
-                    .background(JetBrainsTheme.backgroundTertiary)
-                    .cornerRadius(6)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(position.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
-                    )
-                
-                HStack {
-                    Text("\(position.count)/1000 characters")
-                        .font(.system(size: 12))
-                        .foregroundColor(position.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
+                // Tab selectors
+                HStack(spacing: 0) {
+                    ForEach(["Default", "Text", "Voice", "Screenshot"], id: \.self) { tab in
+                        Button(action: {
+                            withAnimation {
+                                switch tab {
+                                case "Default": selectedContextTab = 0
+                                case "Text": selectedContextTab = 1
+                                case "Voice": selectedContextTab = 2
+                                case "Screenshot": selectedContextTab = 3
+                                default: selectedContextTab = 0
+                                }
+                            }
+                        }) {
+                            Text(tab)
+                                .font(.system(size: 13))
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 12)
+                                .foregroundColor(
+                                    (selectedContextTab == 0 && tab == "Default") ||
+                                    (selectedContextTab == 1 && tab == "Text") ||
+                                    (selectedContextTab == 2 && tab == "Voice") ||
+                                    (selectedContextTab == 3 && tab == "Screenshot") ?
+                                        JetBrainsTheme.accentPrimary : JetBrainsTheme.textSecondary
+                                )
+                                .background(
+                                    (selectedContextTab == 0 && tab == "Default") ||
+                                    (selectedContextTab == 1 && tab == "Text") ||
+                                    (selectedContextTab == 2 && tab == "Voice") ||
+                                    (selectedContextTab == 3 && tab == "Screenshot") ?
+                                        JetBrainsTheme.backgroundPrimary : JetBrainsTheme.backgroundTertiary
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
                     
                     Spacer()
                 }
+                .padding(2)
+                .background(JetBrainsTheme.backgroundTertiary)
+                .cornerRadius(4)
                 
-                Text("Define the context for AI responses. This will be included in all conversations as a system message. You can define a role, add specific instructions, or set the tone for AI responses.")
-                    .font(.system(size: 12))
-                    .foregroundColor(JetBrainsTheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                // Context editor based on selected tab
+                VStack(alignment: .leading, spacing: 8) {
+                    // Switch between different context editors based on tab
+                    switch selectedContextTab {
+                    case 0: // Default
+                        TextEditor(text: $position)
+                            .font(.system(size: 14))
+                            .padding(10)
+                            .frame(height: 200)
+                            .background(JetBrainsTheme.backgroundTertiary)
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(position.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
+                            )
+                        
+                        HStack {
+                            Text("\(position.count)/1000 characters")
+                                .font(.system(size: 12))
+                                .foregroundColor(position.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
+                            
+                            Spacer()
+                        }
+                        
+                        Text("Default context applied to all conversations unless overridden by a more specific context.")
+                            .font(.system(size: 12))
+                            .foregroundColor(JetBrainsTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            
+                    case 1: // Text
+                        TextEditor(text: $textContext)
+                            .font(.system(size: 14))
+                            .padding(10)
+                            .frame(height: 200)
+                            .background(JetBrainsTheme.backgroundTertiary)
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(textContext.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
+                            )
+                        
+                        HStack {
+                            Text("\(textContext.count)/1000 characters")
+                                .font(.system(size: 12))
+                                .foregroundColor(textContext.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
+                            
+                            Spacer()
+                        }
+                        
+                        Text("Context specifically for text chat interactions.")
+                            .font(.system(size: 12))
+                            .foregroundColor(JetBrainsTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            
+                    case 2: // Voice
+                        TextEditor(text: $voiceContext)
+                            .font(.system(size: 14))
+                            .padding(10)
+                            .frame(height: 200)
+                            .background(JetBrainsTheme.backgroundTertiary)
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(voiceContext.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
+                            )
+                        
+                        HStack {
+                            Text("\(voiceContext.count)/1000 characters")
+                                .font(.system(size: 12))
+                                .foregroundColor(voiceContext.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
+                            
+                            Spacer()
+                        }
+                        
+                        Text("Context specifically for interactions via voice/Whisper transcription.")
+                            .font(.system(size: 12))
+                            .foregroundColor(JetBrainsTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        
+                    case 3: // Screenshot
+                        TextEditor(text: $screenshotContext)
+                            .font(.system(size: 14))
+                            .padding(10)
+                            .frame(height: 200)
+                            .background(JetBrainsTheme.backgroundTertiary)
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(screenshotContext.count > 1500 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
+                            )
+                        
+                        HStack {
+                            Text("\(screenshotContext.count)/1500 characters")
+                                .font(.system(size: 12))
+                                .foregroundColor(screenshotContext.count > 1500 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
+                            
+                            Spacer()
+                        }
+                        
+                        Text("Context specifically for screenshot analysis. Includes coding problem detection.")
+                            .font(.system(size: 12))
+                            .foregroundColor(JetBrainsTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        
+                    default:
+                        EmptyView()
+                    }
+                }
                 
-                Divider()
-                    .background(JetBrainsTheme.border)
-                    .padding(.vertical, 6)
-                
-                Text("Example templates:")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(JetBrainsTheme.textPrimary)
-                
+                // Template buttons for the active context
                 HStack {
-                    Button(action: {
-                        position = "You are a helpful coding assistant. Provide clear, concise explanations and focus on best practices in your code examples."
-                    }) {
-                        Text("Coding Assistant")
-                            .font(.system(size: 12))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
+                    if selectedContextTab == 0 {
+                        Button(action: {
+                            position = "You are a helpful assistant that provides clear, informative responses. Explain concepts thoroughly and provide examples when appropriate."
+                        }) {
+                            Text("Reset to Default")
+                                .font(.system(size: 12))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                        }
+                        .buttonStyle(JetBrainsSecondaryButtonStyle())
+                    } else if selectedContextTab == 1 {
+                        Button(action: {
+                            textContext = "You are responding to text input in a conversation. Provide helpful, concise answers based on the user's query."
+                        }) {
+                            Text("Reset to Default")
+                                .font(.system(size: 12))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                        }
+                        .buttonStyle(JetBrainsSecondaryButtonStyle())
+                    } else if selectedContextTab == 2 {
+                        Button(action: {
+                            voiceContext = "You are responding to transcribed voice input. Prioritize concise responses. Be forgiving of transcription errors and unclear phrases."
+                        }) {
+                            Text("Reset to Default")
+                                .font(.system(size: 12))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                        }
+                        .buttonStyle(JetBrainsSecondaryButtonStyle())
+                    } else if selectedContextTab == 3 {
+                        Button(action: {
+                            screenshotContext = """
+                            You are a highly skilled assistant analyzing images and screenshots. When analyzing images, you specialize in:
+                            1. Recognizing programming problems, code, and technical content
+                            2. Providing complete, working solutions to coding problems
+                            3. Explaining algorithms and their time/space complexity
+                            4. Offering code implementations in the appropriate language
+                            
+                            When you see a programming problem, provide the full solution code with explanations, not just a description of what's in the image. Always include the optimal solution and its time/space complexity analysis.
+                            """
+                        }) {
+                            Text("Reset to Default")
+                                .font(.system(size: 12))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                        }
+                        .buttonStyle(JetBrainsSecondaryButtonStyle())
                     }
-                    .buttonStyle(JetBrainsSecondaryButtonStyle())
-                    
-                    Button(action: {
-                        position = "You are a senior software engineer in a technical interview. Respond to questions as if you're demonstrating your expertise during a job interview."
-                    }) {
-                        Text("Interview Mode")
-                            .font(.system(size: 12))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                    }
-                    .buttonStyle(JetBrainsSecondaryButtonStyle())
                 }
             }
             .padding(12)
@@ -387,8 +541,12 @@ struct SettingsView: View {
         // Save settings to SettingsManager
         SettingsManager.shared.apiKey = apiKey
         SettingsManager.shared.windowTransparency = windowTransparency
-        // Save position with character limit (now 1000 characters)
+        
+        // Save all context fields with appropriate character limits
         SettingsManager.shared.position = String(position.prefix(1000))
+        SettingsManager.shared.textContext = String(textContext.prefix(1000))
+        SettingsManager.shared.voiceContext = String(voiceContext.prefix(1000))
+        SettingsManager.shared.screenshotContext = String(screenshotContext.prefix(1500))
         
         // Show saved message
         withAnimation {
