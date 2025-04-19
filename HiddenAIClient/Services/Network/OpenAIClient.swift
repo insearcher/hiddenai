@@ -545,10 +545,18 @@ class OpenAIClient: OpenAIClientProtocol {
             // Create local messages array for this request
             var requestMessages: [[String: Any]] = []
             
-            // Start with system message
+            // Start with system message that's optimized for coding problems
             requestMessages.append([
                 "role": "system", 
-                "content": "You are a helpful assistant. Analyze the provided image and respond to the user's query about it."
+                "content": """
+                You are a highly skilled programming assistant. When analyzing images, you specialize in:
+                1. Recognizing programming problems, code, and technical content
+                2. Providing complete, working solutions to coding problems
+                3. Explaining algorithms and their time/space complexity
+                4. Offering code implementations in the appropriate language
+                
+                When you see a programming problem, provide the full solution code with explanations, not just a description of what's in the image. Always include the optimal solution and its time/space complexity analysis.
+                """
             ])
             
             // Add context messages if available

@@ -322,12 +322,12 @@ class ScreenshotService: NSObject, ScreenshotServiceProtocol, SCStreamOutput {
             )
         }
         
-        // Create a prompt that includes context if available
-        var prompt = "What's in this image?"
+        // Create a smarter prompt that detects and handles coding problems
+        var prompt = "Analyze this image. If it contains code or a programming problem, provide a complete, working solution with explanations and optimal time/space complexity. If it's a coding problem like LeetCode or similar, provide the full solution code, not just a description."
         
         // If we have context info, add a note about it
         if contextInfo != nil && (contextInfo?["replyChain"] as? [UUID])?.isEmpty == false {
-            prompt = "What's in this image? (This is in response to a previous conversation context)"
+            prompt = "Analyze this image, which is in response to a previous conversation. If it contains code or a programming problem, provide a complete, working solution with explanations and optimal time/space complexity. If it's a coding problem like LeetCode or similar, provide the full solution code, not just a description."
         }
         
         // Send to OpenAI via the OpenAIClient - this is network operation so it's ok on background
