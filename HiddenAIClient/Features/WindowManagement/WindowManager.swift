@@ -226,30 +226,33 @@ class WindowManager: NSObject, WindowManagerProtocol {
             let firstResponder = self.window?.firstResponder
             let isEditingTextField = firstResponder is NSTextField || firstResponder is NSTextView
             
-            // Check for Command key modifier
-            if event.modifierFlags.contains(.command) {
-                // Handle app-level command shortcuts
+            // Check for Fn+Command key modifier
+            if event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command) {
+                // Handle app-level Fn+command shortcuts
                 switch event.keyCode {
-                    case 11: // Cmd+B (window visibility)
-                        print("WindowManager passing Cmd+B to application")
+                    case 11: // Fn+Cmd+B (window visibility)
+                        print("WindowManager passing Fn+Cmd+B to application")
                         return event
-                    case 12: // Cmd+Q (quit)
+                    case 12: // Fn+Cmd+Q (quit)
                         return event
-                    case 15: // Cmd+R (Whisper transcription)
-                        print("WindowManager passing Cmd+R to application")
+                    case 15: // Fn+Cmd+R (Whisper transcription)
+                        print("WindowManager passing Fn+Cmd+R to application")
                         return event
-                    case 123, 124, 125, 126: // Arrow keys with Cmd for window movement
+                    case 2: // Fn+Cmd+D (clear chat)
+                        print("WindowManager passing Fn+Cmd+D to application")
+                        return event
+                    case 123, 124, 125, 126: // Arrow keys with Fn+Cmd for window movement
                         if self.handleKeyEvent(event) {
                             // If we handled the arrow key movement, don't pass it along
                             return nil
                         }
                         return event
                     default:
-                        // For other command combinations in text fields, let them pass through
+                        // For other Fn+command combinations in text fields, let them pass through
                         if isEditingTextField {
                             return event
                         }
-                        // Otherwise, ignore other command combinations
+                        // Otherwise, ignore other Fn+command combinations
                         return nil
                 }
             }
@@ -263,13 +266,13 @@ class WindowManager: NSObject, WindowManagerProtocol {
             return event
         }
         
-        // We still need a global monitor to capture Cmd+Arrow for window movement
+        // We still need a global monitor to capture Fn+Cmd+Arrow for window movement
         // when the application doesn't have focus
         globalKeyboardMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return }
             
-            // Only handle Command+Arrow combinations for window movement
-            if event.modifierFlags.contains(.command) {
+            // Only handle Fn+Command+Arrow combinations for window movement
+            if event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command) {
                 switch event.keyCode {
                     case 123, 124, 125, 126: // Arrow keys
                         self.handleKeyEvent(event)
@@ -284,7 +287,7 @@ class WindowManager: NSObject, WindowManagerProtocol {
             window?.makeKey()
         }
         
-        print("WindowManager: Keyboard monitoring setup completed with Cmd+Arrow support")
+        print("WindowManager: Keyboard monitoring setup completed with Fn+Cmd+Arrow support")
     }
     
     // Focus detection is no longer needed since we only use Command key combinations
@@ -296,21 +299,27 @@ class WindowManager: NSObject, WindowManagerProtocol {
         // Debug info
         print("Key pressed in WindowManager: \(event.keyCode), flags: \(event.modifierFlags)")
         
-        // Pass specific command shortcuts to AppDelegate
-        if event.modifierFlags.contains(.command) {
-            // For Cmd+B (window visibility toggle), pass it through to the AppDelegate handler
+        // Pass specific Fn+command shortcuts to AppDelegate
+        if event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command) {
+            // For Fn+Cmd+B (window visibility toggle), pass it through to the AppDelegate handler
             if event.keyCode == 11 {
-                print("WindowManager detected Cmd+B, allowing AppDelegate to handle it")
+                print("WindowManager detected Fn+Cmd+B, allowing AppDelegate to handle it")
                 return false
             }
             
-            // Pass Whisper transcription to AppDelegate (Cmd+R)
+            // Pass Whisper transcription to AppDelegate (Fn+Cmd+R)
             if event.keyCode == 15 {
-                print("WindowManager detected Cmd+R, allowing AppDelegate to handle it")
+                print("WindowManager detected Fn+Cmd+R, allowing AppDelegate to handle it")
                 return false
             }
             
-            // Handle Command+Arrow keys for window movement
+            // Pass clear chat to AppDelegate (Fn+Cmd+D)
+            if event.keyCode == 2 {
+                print("WindowManager detected Fn+Cmd+D, allowing AppDelegate to handle it")
+                return false
+            }
+            
+            // Handle Fn+Command+Arrow keys for window movement
             // Only proceed if it's an arrow key
             switch event.keyCode {
                 case 123, 124, 125, 126: // Arrow keys
@@ -320,16 +329,16 @@ class WindowManager: NSObject, WindowManagerProtocol {
                     // Move window based on arrow key
                     switch event.keyCode {
                         case 123: // Left arrow
-                            print("Moving window left with Cmd+Left Arrow")
+                            print("Moving window left with Fn+Cmd+Left Arrow")
                             frame.origin.x -= moveDistance
                         case 124: // Right arrow
-                            print("Moving window right with Cmd+Right Arrow")
+                            print("Moving window right with Fn+Cmd+Right Arrow")
                             frame.origin.x += moveDistance
                         case 125: // Down arrow
-                            print("Moving window down with Cmd+Down Arrow")
+                            print("Moving window down with Fn+Cmd+Down Arrow")
                             frame.origin.y -= moveDistance
                         case 126: // Up arrow
-                            print("Moving window up with Cmd+Up Arrow")
+                            print("Moving window up with Fn+Cmd+Up Arrow")
                             frame.origin.y += moveDistance
                         default:
                             return false
@@ -350,7 +359,7 @@ class WindowManager: NSObject, WindowManagerProtocol {
             }
         }
         
-        // We only handle Cmd+Arrow combinations now
+        // We only handle Fn+Cmd+Arrow combinations now
         return false
     }
     

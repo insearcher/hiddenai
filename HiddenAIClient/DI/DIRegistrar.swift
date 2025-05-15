@@ -4,6 +4,7 @@
 //
 //  Created on 4/11/25.
 //  Updated on 4/20/25 to support refactored ConversationView
+//  Updated to support SystemAudioRecorder for system + microphone audio recording
 //
 
 import Foundation
@@ -11,8 +12,14 @@ import SwiftUI
 
 /// Class responsible for registering all services with the DI container
 class DIRegistrar {
+    /// Configuration for which audio recorder to use
+    enum AudioRecorderType {
+        case microphoneOnly  // Original AudioRecorder - microphone only
+        case systemAndMicrophone  // New SystemAudioRecorder - system + microphone
+    }
+    
     /// Configures all dependencies in the DI container
-    static func configure() {
+    static func configure(audioRecorderType: AudioRecorderType = .systemAndMicrophone) {
         let container = DIContainer.shared
         
         // System services - no dependencies
@@ -22,7 +29,7 @@ class DIRegistrar {
         registerCoreServices(in: container)
         
         // Feature services - depend on core services
-        registerFeatureServices(in: container)
+        registerFeatureServices(in: container, audioRecorderType: audioRecorderType)
         
         print("DI container configured with all services")
     }
@@ -53,7 +60,7 @@ class DIRegistrar {
     }
     
     /// Register feature services (depend on core services)
-    private static func registerFeatureServices(in container: DIContainer) {
+    private static func registerFeatureServices(in container: DIContainer, audioRecorderType: AudioRecorderType) {
         // Get dependencies
         let notificationService = container.resolve(NotificationServiceProtocol.self)!
         let settingsManager = container.resolve(SettingsManagerProtocol.self)!
@@ -63,8 +70,16 @@ class DIRegistrar {
         let openAIClient = OpenAIClient(settingsManager: settingsManager, notificationService: notificationService)
         container.registerSingleton(OpenAIClientProtocol.self, instance: openAIClient)
         
-        // AudioRecorder
-        let audioRecorder = AudioRecorder(notificationService: notificationService, permissionManager: permissionManager)
+        // AudioRecorder - Choose implementation based on configuration
+        let audioRecorder: AudioServiceProtocol
+        switch audioRecorderType {
+        case .microphoneOnly:
+            print("Using microphone-only AudioRecorder")
+            audioRecorder = AudioRecorder(notificationService: notificationService, permissionManager: permissionManager)
+        case .systemAndMicrophone:
+            print("Using system + microphone SystemAudioRecorder")
+            audioRecorder = SystemAudioRecorder(notificationService: notificationService, permissionManager: permissionManager)
+        }
         container.registerSingleton(AudioServiceProtocol.self, instance: audioRecorder)
         
         // WhisperTranscriptionService
@@ -102,7 +117,7 @@ class DIRegistrar {
         // Register the AppDelegate as a singleton once it's created
         // This will be done in the HiddenAIClientApp.swift
         
-        print("Feature services registered")
+        print("Feature services registered with \(audioRecorderType) audio recorder")
     }
     
     /// Create a view factory for SwiftUI views

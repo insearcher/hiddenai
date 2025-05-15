@@ -3,6 +3,7 @@
 //  HiddenAIClient
 //
 //  Created on 4/20/25.
+//  Updated to use Fn+Cmd+ shortcuts (Fn+Cmd+R for Whisper, Fn+Cmd+P for Screenshot, Fn+Cmd+D for Clear Chat)
 //
 
 import SwiftUI
@@ -44,7 +45,7 @@ struct ControlBarView: View {
                 )
             }
             .buttonStyle(PlainButtonStyle())
-            .help("Record audio and transcribe with OpenAI Whisper (Cmd+R)")
+            .help("Record audio and transcribe with OpenAI Whisper (Fn+Cmd+R)")
             
             // Screenshot button
             Button(action: viewModel.captureScreenshot) {
@@ -77,14 +78,28 @@ struct ControlBarView: View {
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(viewModel.isProcessingScreenshot)
-            .help("Capture screen and analyze with GPT-4o (Cmd+P)")
+            .help("Capture screen and analyze with GPT-4o (Fn+Cmd+P)")
+            
+            // Processing indicator (between screenshot and shortcuts)
+            if viewModel.processingStage != .none {
+                HStack(spacing: 5) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: JetBrainsTheme.textPrimary))
+                        .scaleEffect(0.7)
+                    
+                    Text(viewModel.processingStage.displayText)
+                        .font(.system(size: 12))
+                        .foregroundColor(JetBrainsTheme.textSecondary)
+                }
+                .padding(.horizontal, 12)
+            }
             
             Spacer()
             
-            // Keyboard shortcuts
+            // Keyboard shortcuts - updated to show Fn+Cmd+R and add Fn+Cmd+D
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text("⌘+R")
+                    Text("Fn+⌘+R")
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
@@ -101,7 +116,7 @@ struct ControlBarView: View {
                 }
                 
                 HStack(spacing: 6) {
-                    Text("⌘+P")
+                    Text("Fn+⌘+P")
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
@@ -116,16 +131,20 @@ struct ControlBarView: View {
                         .font(.system(size: 12))
                         .foregroundColor(JetBrainsTheme.textSecondary)
                 }
-            }
-            
-            // Status indicators
-            if viewModel.isProcessing {
-                HStack(spacing: 5) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: JetBrainsTheme.textPrimary))
-                        .scaleEffect(0.7)
+                
+                HStack(spacing: 6) {
+                    Text("Fn+⌘+D")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(JetBrainsTheme.warning.opacity(0.15))
+                        .cornerRadius(4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(JetBrainsTheme.warning.opacity(0.3), lineWidth: 1)
+                        )
                     
-                    Text("Processing...")
+                    Text("Clear Chat")
                         .font(.system(size: 12))
                         .foregroundColor(JetBrainsTheme.textSecondary)
                 }

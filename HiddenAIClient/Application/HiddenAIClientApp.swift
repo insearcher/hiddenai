@@ -3,6 +3,9 @@
 //  HiddenAIClient
 //
 //  Created by Maxim Frolov on 4/8/25.
+//  Updated to use SystemAudioRecorder for system + microphone audio recording
+//  Updated all keyboard shortcuts to use Fn+Cmd+ combinations
+//  Updated Whisper shortcut to Fn+Cmd+R and added Fn+Cmd+D for clear chat
 //
 
 import SwiftUI
@@ -15,8 +18,8 @@ struct HiddenAIClientApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     init() {
-        // Configure DI container before the app initializes
-        DIRegistrar.configure()
+        // Configure DI container to use system + microphone audio recorder
+        DIRegistrar.configure(audioRecorderType: .systemAndMicrophone)
         
         // Register app delegate after it's created by SwiftUI
         // This works because @NSApplicationDelegateAdaptor initializes the delegate
@@ -143,9 +146,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
             object: nil
         )
         
-        // Pre-request screen capture permission
+        // Pre-request screen capture permission (needed for system audio)
         permissionManager.requestScreenCapturePermission { granted in
             print("Screen capture permission \(granted ? "granted" : "denied")")
+            
+            if granted {
+                print("System audio recording is now available")
+            } else {
+                print("System audio recording requires screen capture permission")
+            }
         }
         
         // Perform additional setup after a slight delay
@@ -161,19 +170,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
     
     private func setupKeyEventMonitoring() {
         // Using both local and global event monitors for reliable key detection
-        // Only focusing on the required shortcuts: Cmd+B, Cmd+Q, and Cmd+V
+        // Updated shortcuts: Fn+Cmd+B, Fn+Cmd+R, Fn+Cmd+P, Fn+Cmd+D, and Fn+Cmd+Q
         
         // Set up a local monitor to catch key events within our own app
         // This works even when text fields have focus
         let localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return event }
             
-            // Only handle Command key combinations
-            let hasCommandModifier = event.modifierFlags.contains(.command)
-            if hasCommandModifier {
-                print("AppDelegate local monitor detected Command key: \(event.keyCode)")
+            // Only handle Fn+Command key combinations
+            let hasFnCommandModifier = event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command)
+            if hasFnCommandModifier {
+                print("AppDelegate local monitor detected Fn+Command key: \(event.keyCode)")
                 
-                let handled = self.handleCommandKeyCombo(event)
+                let handled = self.handleFnCommandKeyCombo(event)
                 if handled {
                     return nil // Prevent the event from propagating if we handled it
                 }
@@ -191,42 +200,49 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
         NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return }
             
-            // Only handle Command key combinations
-            let hasCommandModifier = event.modifierFlags.contains(.command)
-            if hasCommandModifier {
-                print("AppDelegate global monitor detected Command key: \(event.keyCode)")
-                self.handleCommandKeyCombo(event)
+            // Only handle Fn+Command key combinations
+            let hasFnCommandModifier = event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command)
+            if hasFnCommandModifier {
+                print("AppDelegate global monitor detected Fn+Command key: \(event.keyCode)")
+                self.handleFnCommandKeyCombo(event)
             }
         }
     }
     
-    // Helper method to handle command key combinations - simplified to only handle required shortcuts
+    // Helper method to handle Fn+command key combinations
     @discardableResult
-    private func handleCommandKeyCombo(_ event: NSEvent) -> Bool {
+    private func handleFnCommandKeyCombo(_ event: NSEvent) -> Bool {
         switch event.keyCode {
-            case 11: // Cmd+B (toggle window visibility)
-                print("AppDelegate processing Cmd+B key - toggling window visibility")
+            case 11: // Fn+Cmd+B (toggle window visibility)
+                print("AppDelegate processing Fn+Cmd+B key - toggling window visibility")
                 DispatchQueue.main.async {
                     self.toggleWindowVisibility()
                 }
                 return true
                 
-            case 15: // Cmd+R (toggle Whisper transcription)
-                print("AppDelegate processing Cmd+R key - toggling Whisper transcription")
+            case 15: // Fn+Cmd+R (toggle Whisper transcription) - changed back to R
+                print("AppDelegate processing Fn+Cmd+R key - toggling Whisper transcription")
                 DispatchQueue.main.async {
                     self.toggleWhisperTranscription()
                 }
                 return true
                 
-            case 35: // Cmd+P (capture screenshot)
-                print("AppDelegate processing Cmd+P key - capturing screenshot")
+            case 35: // Fn+Cmd+P (capture screenshot)
+                print("AppDelegate processing Fn+Cmd+P key - capturing screenshot")
                 DispatchQueue.main.async {
                     self.captureScreenshot()
                 }
                 return true
                 
-            case 12: // Cmd+Q (quit app)
-                print("AppDelegate processing Cmd+Q key - quitting app")
+            case 2: // Fn+Cmd+D (clear chat history)
+                print("AppDelegate processing Fn+Cmd+D key - clearing chat history")
+                DispatchQueue.main.async {
+                    self.clearChatHistory()
+                }
+                return true
+                
+            case 12: // Fn+Cmd+Q (quit app)
+                print("AppDelegate processing Fn+Cmd+Q key - quitting app")
                 DispatchQueue.main.async {
                     self.quitApp()
                 }
@@ -264,7 +280,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
         }
         
         // Print a message to confirm keyboard shortcut handlers are active
-        print("AppDelegate: Keyboard shortcut handlers are set up - limited to Cmd+B, Cmd+R, Cmd+P, and Cmd+Q")
+        print("AppDelegate: Keyboard shortcut handlers are set up - shortcuts: Fn+Cmd+B, Fn+Cmd+R, Fn+Cmd+P, Fn+Cmd+D, and Fn+Cmd+Q")
     }
     
     // Add method to toggle Whisper transcription
@@ -527,6 +543,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
         }
     }
     
+    /// Clear chat history
+    @objc func clearChatHistory() {
+        print("AppDelegate clearChatHistory called")
+        
+        // Get the conversation view model and clear the conversation
+        if let viewModel = DIContainer.shared.resolve(ConversationViewModel.self) {
+            viewModel.clearConversation()
+            print("Chat history cleared successfully")
+        } else {
+            print("ERROR: Could not resolve ConversationViewModel to clear chat")
+        }
+    }
+    
     // Request all permissions needed by the app
     private func requestAppPermissions() {
         // Request all permissions through the PermissionManager
@@ -537,7 +566,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
             if results[.microphone] != true {
                 print("Microphone permission denied - recording functionality will be limited")
             }
+            if results[.screenCapture] != true {
+                print("Screen capture permission denied - system audio recording will not work")
+            }
         }
+    }
+    
+    // DEBUGGING: Add test function to diagnose system audio issues
+    @objc private func testSystemAudio() {
+        print("\n🔍 DEBUGGING: Testing system audio...")
+        PermissionDebugUtility.checkAllPermissions()
+        PermissionDebugUtility.testScreenCapturePermission()
     }
     
     // Application lifecycle events

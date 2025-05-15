@@ -25,14 +25,14 @@ class GlobalHotkeyManager {
     // Private initializer for singleton
     private init() {}
     
-    // Register global hotkeys - simplified to only try Cmd+B
+    // Register global hotkeys - updated to try Fn+Cmd+B
     func registerHotkeys() {
-        // Only try to register Cmd+B as it's the primary shortcut we need
-        let registered = tryRegisterHotkey(keyCode: 11, modifiers: UInt32(1 << 8), name: "Cmd+B")
+        // Try to register Fn+Cmd+B as the primary shortcut
+        let registered = tryRegisterHotkey(keyCode: 11, modifiers: UInt32(1 << 8 | 1 << 17), name: "Fn+Cmd+B")
         
         if !registered {
-            // If unable to register Cmd+B, try Cmd+Opt+B as a fallback
-            _ = tryRegisterHotkey(keyCode: 11, modifiers: UInt32(1 << 8 | 1 << 11), name: "Cmd+Opt+B")
+            // If unable to register Fn+Cmd+B, try Cmd+B as fallback
+            _ = tryRegisterHotkey(keyCode: 11, modifiers: UInt32(1 << 8), name: "Cmd+B (fallback)")
         }
         
         // Install event handler even if registration fails

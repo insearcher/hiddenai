@@ -9,14 +9,43 @@ import Foundation
 import SwiftUI
 import Combine
 
+/// Represents different processing stages
+enum ProcessingStage {
+    case none
+    case whisperRecording
+    case whisperProcessing
+    case openAIProcessing
+    case screenshot
+    
+    var displayText: String {
+        switch self {
+        case .none:
+            return ""
+        case .whisperRecording:
+            return "Recording..."
+        case .whisperProcessing:
+            return "Processing: Whisper"
+        case .openAIProcessing:
+            return "Processing: OpenAI"
+        case .screenshot:
+            return "Processing: Screenshot"
+        }
+    }
+}
+
 class ConversationViewModel: ObservableObject {
     // MARK: - Published Properties
     
     /// Messages displayed in the conversation
     @Published var messages: [Message] = []
     
-    /// Whether the app is currently processing a request
-    @Published var isProcessing: Bool = false
+    /// Current processing stage
+    @Published var processingStage: ProcessingStage = .none
+    
+    /// Computed property for backward compatibility
+    var isProcessing: Bool {
+        return processingStage != .none
+    }
     
     /// Whether the API key is set
     @Published var apiKeyIsSet: Bool = false
@@ -130,6 +159,7 @@ class ConversationViewModel: ObservableObject {
         }
         
         isProcessingScreenshot = true
+        processingStage = .screenshot
         
         // Request screenshot capture through notification
         notificationService.post(name: .captureScreenshotRequested, object: nil)
@@ -177,7 +207,7 @@ class ConversationViewModel: ObservableObject {
         
         // Send to OpenAI for processing
         if openAIClient.hasApiKey {
-            isProcessing = true
+            processingStage = .openAIProcessing
             
             // Send a regular request - no reply context needed
             openAIClient.sendRequest(prompt: text) { [weak self] result in
@@ -186,10 +216,10 @@ class ConversationViewModel: ObservableObject {
                 if case .failure(let error) = result {
                     DispatchQueue.main.async {
                         self?.addMessage("Error: \(error.localizedDescription)", type: .assistant)
-                        self?.isProcessing = false
+                        self?.processingStage = .none
                     }
                 }
-                // We don't set isProcessing = false for success case 
+                // We don't set processingStage = .none for success case 
                 // as the notification handler will do that
             }
         } else {
@@ -236,6 +266,7 @@ class ConversationViewModel: ObservableObject {
                    let errorMessage = userInfo["error"] {
                     DispatchQueue.main.async {
                         self?.isProcessingScreenshot = false
+                        self?.processingStage = .none
                         self?.addMessage("Screenshot error: \(errorMessage)", type: .assistant)
                     }
                 }
@@ -248,6 +279,7 @@ class ConversationViewModel: ObservableObject {
             handler: { [weak self] notification in
                 DispatchQueue.main.async {
                     self?.isWhisperRecording = true
+                    self?.processingStage = .whisperRecording
                     // Get initial time from notification if provided
                     if let userInfo = notification.object as? [String: String],
                        let initialTime = userInfo["timeString"] {
@@ -264,6 +296,7 @@ class ConversationViewModel: ObservableObject {
             handler: { [weak self] notification in
                 DispatchQueue.main.async {
                     self?.isWhisperRecording = false
+                    self?.processingStage = .whisperProcessing
                 }
             }
         )
@@ -289,6 +322,7 @@ class ConversationViewModel: ObservableObject {
                    let transcript = userInfo["transcript"] as? String,
                    !transcript.isEmpty {
                     DispatchQueue.main.async {
+                        self?.processingStage = .none  // Reset processing stage
                         self?.processTranscription(transcript)
                     }
                 }
@@ -302,6 +336,7 @@ class ConversationViewModel: ObservableObject {
                 if let userInfo = notification.object as? [String: Any],
                    let errorMessage = userInfo["error"] as? String {
                     DispatchQueue.main.async {
+                        self?.processingStage = .none  // Reset processing stage on error
                         self?.addMessage("Whisper transcription error: \(errorMessage)", type: .assistant)
                     }
                 }
@@ -318,7 +353,7 @@ class ConversationViewModel: ObservableObject {
                         self?.addMessage(response, type: .assistant)
                         
                         // Always stop processing indicators after a response
-                        self?.isProcessing = false
+                        self?.processingStage = .none
                         self?.isProcessingScreenshot = false
                     }
                 }
@@ -333,7 +368,7 @@ class ConversationViewModel: ObservableObject {
                    let error = userInfo["error"] as? String {
                     DispatchQueue.main.async {
                         self?.addMessage("Error: \(error)", type: .assistant)
-                        self?.isProcessing = false
+                        self?.processingStage = .none
                         self?.isProcessingScreenshot = false
                     }
                 }
