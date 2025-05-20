@@ -231,13 +231,13 @@ struct SettingsView: View {
                             .cornerRadius(6)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(position.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
+                                    .stroke(position.count > 2000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
                             )
                         
                         HStack {
-                            Text("\(position.count)/1000 characters")
+                            Text("\(position.count)/2000 characters")
                                 .font(.system(size: 12))
-                                .foregroundColor(position.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
+                                .foregroundColor(position.count > 2000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
                             
                             Spacer()
                         }
@@ -256,13 +256,13 @@ struct SettingsView: View {
                             .cornerRadius(6)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(textContext.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
+                                    .stroke(textContext.count > 2000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
                             )
                         
                         HStack {
-                            Text("\(textContext.count)/1000 characters")
+                            Text("\(textContext.count)/2000 characters")
                                 .font(.system(size: 12))
-                                .foregroundColor(textContext.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
+                                .foregroundColor(textContext.count > 2000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
                             
                             Spacer()
                         }
@@ -281,13 +281,13 @@ struct SettingsView: View {
                             .cornerRadius(6)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(voiceContext.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
+                                    .stroke(voiceContext.count > 2000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
                             )
                         
                         HStack {
-                            Text("\(voiceContext.count)/1000 characters")
+                            Text("\(voiceContext.count)/2000 characters")
                                 .font(.system(size: 12))
-                                .foregroundColor(voiceContext.count > 1000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
+                                .foregroundColor(voiceContext.count > 2000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
                             
                             Spacer()
                         }
@@ -306,13 +306,13 @@ struct SettingsView: View {
                             .cornerRadius(6)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(screenshotContext.count > 1500 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
+                                    .stroke(screenshotContext.count > 2000 ? JetBrainsTheme.error : JetBrainsTheme.border, lineWidth: 1)
                             )
                         
                         HStack {
-                            Text("\(screenshotContext.count)/1500 characters")
+                            Text("\(screenshotContext.count)/2000 characters")
                                 .font(.system(size: 12))
-                                .foregroundColor(screenshotContext.count > 1500 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
+                                .foregroundColor(screenshotContext.count > 2000 ? JetBrainsTheme.error : JetBrainsTheme.textSecondary)
                             
                             Spacer()
                         }
@@ -543,10 +543,10 @@ struct SettingsView: View {
         SettingsManager.shared.windowTransparency = windowTransparency
         
         // Save all context fields with appropriate character limits
-        SettingsManager.shared.position = String(position.prefix(1000))
-        SettingsManager.shared.textContext = String(textContext.prefix(1000))
-        SettingsManager.shared.voiceContext = String(voiceContext.prefix(1000))
-        SettingsManager.shared.screenshotContext = String(screenshotContext.prefix(1500))
+        SettingsManager.shared.position = String(position.prefix(2000))
+        SettingsManager.shared.textContext = String(textContext.prefix(2000))
+        SettingsManager.shared.voiceContext = String(voiceContext.prefix(2000))
+        SettingsManager.shared.screenshotContext = String(screenshotContext.prefix(2000))
         
         // Show saved message
         withAnimation {

@@ -80,8 +80,8 @@ class SettingsManager: SettingsManagerProtocol {
             return UserDefaults.standard.string(forKey: Keys.position) ?? defaultContext
         }
         set {
-            // Enforce character limit - maximum of 1000 characters
-            let limitedValue = String(newValue.prefix(1000))
+            // Enforce character limit - maximum of 2000 characters
+            let limitedValue = String(newValue.prefix(2000))
             UserDefaults.standard.set(limitedValue, forKey: Keys.position)
         }
     }
@@ -97,7 +97,7 @@ class SettingsManager: SettingsManagerProtocol {
         }
         set {
             // Enforce character limit
-            let limitedValue = String(newValue.prefix(1000))
+            let limitedValue = String(newValue.prefix(2000))
             UserDefaults.standard.set(limitedValue, forKey: Keys.voiceContext)
         }
     }
@@ -120,7 +120,7 @@ class SettingsManager: SettingsManagerProtocol {
         }
         set {
             // Enforce character limit
-            let limitedValue = String(newValue.prefix(1500)) // Allow slightly longer for screenshot context
+            let limitedValue = String(newValue.prefix(2000)) // Allow 2000 characters for screenshot context
             UserDefaults.standard.set(limitedValue, forKey: Keys.screenshotContext)
         }
     }
@@ -136,7 +136,7 @@ class SettingsManager: SettingsManagerProtocol {
         }
         set {
             // Enforce character limit
-            let limitedValue = String(newValue.prefix(1000))
+            let limitedValue = String(newValue.prefix(2000))
             UserDefaults.standard.set(limitedValue, forKey: Keys.textContext)
         }
     }
