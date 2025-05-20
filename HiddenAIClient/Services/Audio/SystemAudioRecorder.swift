@@ -22,6 +22,11 @@ class SystemAudioRecorder: NSObject, AudioServiceProtocol, SCStreamOutput, SCStr
     private var recordingURL: URL?
     private var streamConfiguration: SCStreamConfiguration?
     
+    // Debounce mechanism to prevent rapid toggling
+    private var lastActionTime: Date?
+    private let minimumActionInterval: TimeInterval = 1.0
+    private var lastStopTime: Date?
+    
     // Debugging
     private var audioSampleCount = 0
     private var lastAudioReceived: Date?
@@ -367,6 +372,9 @@ class SystemAudioRecorder: NSObject, AudioServiceProtocol, SCStreamOutput, SCStr
         
         recording = false
         
+        // Record when we stopped to enforce delay before starting again
+        lastStopTime = Date()
+        
         // Calculate duration
         let duration: String
         if let startTime = startTime {
@@ -443,9 +451,33 @@ class SystemAudioRecorder: NSObject, AudioServiceProtocol, SCStreamOutput, SCStr
     
     func toggleRecording() {
         print("SystemAudioRecorder - Toggle recording (current: \(recording))")
+        
+        // Prevent rapid toggling that can cause device conflicts
+        let now = Date()
+        if let lastAction = lastActionTime, now.timeIntervalSince(lastAction) < minimumActionInterval {
+            print("Ignoring rapid toggle - preventing device conflicts")
+            notificationService.post(
+                name: Notification.Name.openaiError,
+                object: ["error": "Please wait a moment before toggling recording again"]
+            )
+            return
+        }
+        lastActionTime = now
+        
         if recording {
             _ = stopRecording()
         } else {
+            // Check if we recently stopped - add delay if needed
+            if let lastStop = lastStopTime, now.timeIntervalSince(lastStop) < 1.0 {
+                print("Recently stopped recording - adding delay before starting again")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if !self.recording { // Double-check we haven't started in the meantime
+                        _ = self.startRecording()
+                    }
+                }
+                return
+            }
+            
             _ = startRecording()
         }
     }

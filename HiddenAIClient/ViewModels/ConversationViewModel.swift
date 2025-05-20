@@ -337,7 +337,28 @@ class ConversationViewModel: ObservableObject {
                    let errorMessage = userInfo["error"] as? String {
                     DispatchQueue.main.async {
                         self?.processingStage = .none  // Reset processing stage on error
-                        self?.addMessage("Whisper transcription error: \(errorMessage)", type: .assistant)
+                        
+                        // Better error handling with more user-friendly messages
+                        let friendlyMessage: String
+                        
+                        // Network errors
+                        if errorMessage.contains("cancelled") {
+                            friendlyMessage = "Transcription was cancelled due to a network issue. Please try again."
+                        } 
+                        // Empty recordings
+                        else if errorMessage.contains("too short") || errorMessage.contains("no audio") || errorMessage.contains("too small") {
+                            friendlyMessage = "Recording was too short or no audio was detected. Please try again."
+                        }
+                        // Rate limit errors
+                        else if errorMessage.contains("wait") || errorMessage.contains("429") {
+                            friendlyMessage = errorMessage
+                        }
+                        // Default error
+                        else {
+                            friendlyMessage = "Whisper transcription error: \(errorMessage)"
+                        }
+                        
+                        self?.addMessage(friendlyMessage, type: .assistant)
                     }
                 }
             }
@@ -367,7 +388,22 @@ class ConversationViewModel: ObservableObject {
                 if let userInfo = notification.object as? [String: Any],
                    let error = userInfo["error"] as? String {
                     DispatchQueue.main.async {
-                        self?.addMessage("Error: \(error)", type: .assistant)
+                        // Customize error messages for better UX
+                        let friendlyMessage: String
+                        
+                        if error.contains("API key not set") {
+                            friendlyMessage = "Please set your OpenAI API key in settings to use this feature."
+                        } else if error.contains("cancelled") {
+                            friendlyMessage = "Request was cancelled. Please try again."
+                        } else if error.contains("timeout") || error.contains("timed out") {
+                            friendlyMessage = "Connection timed out. Please check your internet connection and try again."
+                        } else if error.contains("Screen") && error.contains("permission") {
+                            friendlyMessage = "Screen recording permission is required. Please check your Privacy settings."
+                        } else {
+                            friendlyMessage = "Error: \(error)"
+                        }
+                        
+                        self?.addMessage(friendlyMessage, type: .assistant)
                         self?.processingStage = .none
                         self?.isProcessingScreenshot = false
                     }
