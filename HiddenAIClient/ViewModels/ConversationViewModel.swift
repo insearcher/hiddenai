@@ -413,15 +413,18 @@ final class ConversationViewModel: ObservableObject {
             }
         )
         
-        // OpenAI API responses (legacy notification - now only used for stopping processing indicators)
+        // OpenAI API responses (handles both async and legacy callback responses)
         addNotificationObserver(
             forName: Notification.Name("OpenAIResponseReceived"),
             handler: { [weak self] notification in
                 if let userInfo = notification.object as? [String: Any],
-                   let _ = userInfo["response"] as? String {
+                   let response = userInfo["response"] as? String {
                     DispatchQueue.main.async {
-                        // NOTE: Message adding is now handled by async methods directly
-                        // Only handle processing state cleanup here
+                        // Add the response message to the conversation
+                        // This handles screenshot responses and other legacy callback-based responses
+                        self?.addMessage(response, type: .assistant)
+                        
+                        // Clear processing state
                         self?.processingStage = .none
                         self?.isProcessingScreenshot = false
                     }
