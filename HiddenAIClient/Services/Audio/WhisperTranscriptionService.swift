@@ -66,9 +66,7 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     private func requestMicrophonePermission() {
         // Just request permission without activating the microphone
         permissionManager.requestMicrophonePermission { granted in
-            if granted {
-                print("Microphone access granted for Whisper transcription")
-            } else {
+            if !granted {
                 print("Microphone access denied - Whisper transcription will not work")
             }
         }
@@ -80,7 +78,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     func startRecording() -> Bool {
         // Check if already recording
         if isRecording {
-            print("Already recording audio for transcription")
             return true
         }
         
@@ -91,11 +88,8 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
         recordingURL = TempFileManager.shared.createTempFileURL(prefix: "whisper_recording", extension: "m4a")
         
         guard let fileURL = recordingURL else {
-            print("Failed to create recording file URL")
             return false
         }
-        
-        print("Will save Whisper recording to: \(fileURL.path)")
         
         // Recording settings for AAC format (optimal for Whisper API)
         let settings: [String: Any] = [
@@ -125,14 +119,11 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
                     name: .whisperRecordingStarted, 
                     object: ["timeString": _recordingTimeString]
                 )
-                print("Started recording for Whisper transcription")
                 return true
             } else {
-                print("Failed to start recording for Whisper transcription")
                 return false
             }
         } catch {
-            print("Error creating audio recorder: \(error.localizedDescription)")
             return false
         }
     }
@@ -170,7 +161,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
             name: .whisperRecordingStopped, 
             object: ["finalDuration": durationString]
         )
-        print("Stopped recording for Whisper transcription. Duration: \(durationString)")
         
         // Keep a reference to the file URL
         let finalFileURL = fileURL
@@ -182,8 +172,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: finalFileURL.path)
             if let fileSize = attributes[.size] as? Int64 {
-                print("Recording file size: \(fileSize) bytes")
-                
                 if fileSize < 1000 {
                     // File is too small, likely no audio was recorded
                     let error = NSError(domain: "WhisperTranscriptionService", code: 400, 
@@ -198,7 +186,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
                 }
             }
         } catch {
-            print("Warning: Could not check file size: \(error.localizedDescription)")
             // Continue anyway, let OpenAI try to process it
         }
         
@@ -210,7 +197,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
                 
                 switch result {
                 case .success(let transcript):
-                    print("Received transcript from Whisper API: \(transcript)")
                     completion(.success(transcript))
                     
                     // Post notification with transcript and include any context
@@ -234,18 +220,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
                     }
                     
                 case .failure(let error):
-                    print("Error transcribing audio: \(error.localizedDescription)")
-                    
-                    // Check if this is a network error that might be resolved with a retry
-                    let nsError = error as NSError
-                    if nsError.domain == NSURLErrorDomain {
-                        if nsError.code == NSURLErrorCancelled {
-                            print("Network request was cancelled - possibly app state changed")
-                        } else {
-                            print("Network error encountered during transcription")
-                        }
-                    }
-                    
                     completion(.failure(error))
                     
                     // Post notification about error
@@ -268,7 +242,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
         // Prevent rapid toggling that can cause device conflicts
         let now = Date()
         if let lastAction = lastActionTime, now.timeIntervalSince(lastAction) < minimumActionInterval {
-            print("Ignoring rapid toggle - preventing device conflicts")
             let error = NSError(domain: "WhisperTranscriptionService", code: 429, 
                               userInfo: [NSLocalizedDescriptionKey: "Please wait a moment before toggling recording again"])
             completion(.failure(error))
@@ -286,7 +259,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
         } else {
             // Check if we recently stopped - add delay if needed
             if let lastStop = lastStopTime, now.timeIntervalSince(lastStop) < 1.0 {
-                print("Recently stopped recording - adding delay before starting again")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     if !self.isRecording { // Double-check we haven't started in the meantime
                         let success = self.startRecording()
@@ -379,7 +351,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
         if !flag {
-            print("Recording ended unsuccessfully")
             isRecording = false
             notificationService.post(
                 name: .whisperTranscriptionError,
@@ -390,7 +361,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     
     func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
         if let error = error {
-            print("Error during recording: \(error.localizedDescription)")
             isRecording = false
             notificationService.post(
                 name: .whisperTranscriptionError,

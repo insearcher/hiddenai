@@ -505,43 +505,12 @@ class SystemAudioRecorder: NSObject, AudioServiceProtocol, SCStreamOutput, SCStr
         // Write to file if ready
         if writerInput.isReadyForMoreMediaData {
             writerInput.append(sampleBuffer)
-            
-            // Log first few samples for debugging
-            if audioSampleCount <= 5 {
-                print("✅ Received audio sample \(audioSampleCount)")
-                
-                // Debug: Sample buffer info
-                if audioSampleCount == 1 {
-                    if let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) {
-                        print("Audio format: \(formatDescription)")
-                    }
-                }
-            } else if audioSampleCount == 6 {
-                print("... continuing to receive audio samples")
-                
-                // Set up periodic logging
-                DispatchQueue.main.async {
-                    Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { timer in
-                        if !self.recording {
-                            timer.invalidate()
-                            return
-                        }
-                        print("Audio samples: \(self.audioSampleCount)")
-                    }
-                }
-            }
-        } else {
-            // Log if we can't write samples
-            if audioSampleCount % 100 == 0 {  // Log every 100th time to avoid spam
-                print("⚠️  WARNING: Audio writer not ready for more data (sample \(audioSampleCount))")
-            }
         }
     }
     
     // MARK: - SCStreamDelegate
     
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        print("❌ Stream stopped with error: \(error)")
         recording = false
         cleanupResources()
         

@@ -6,12 +6,12 @@ A macOS application that creates a floating, hideable window for interacting wit
 
 ## Features
 
-- **Floating Window**: Create a window that can be toggled with keyboard shortcuts (Cmd+B)
-- **Screenshot Analysis**: Capture your screen and get AI analysis (Cmd+P)
-- **Audio Transcription**: Record audio and transcribe with Whisper (Cmd+R)
+- **Floating Window**: Create a window that can be toggled with keyboard shortcuts (Fn+Cmd+B)
+- **Screenshot Analysis**: Capture your screen and get AI analysis (Fn+Cmd+P)
+- **Audio Transcription**: Record audio and transcribe with Whisper (Fn+Cmd+R)
 - **Text Conversations**: Chat directly with GPT-4o
 - **Customizable Context**: Configure the AI's system message for your specific needs
-- **Window Management**: Adjust transparency, move with keyboard shortcuts, and toggle click-through mode
+- **Window Management**: Adjust transparency, drag to move window, and toggle click-through mode
 
 ## Requirements
 
@@ -52,11 +52,25 @@ A macOS application that creates a floating, hideable window for interacting wit
 
 ### Keyboard Shortcuts
 
-- **⌘+B**: Toggle window visibility
-- **⌘+R**: Toggle Whisper transcription (voice recording)
-- **⌘+P**: Capture screenshot for AI analysis
-- **⌘+Arrow Keys**: Move window around the screen
-- **⌘+Q**: Quit application
+- **Fn+⌘+B**: Toggle window visibility
+- **Fn+⌘+R**: Toggle Whisper transcription (voice recording)
+- **Fn+⌘+P**: Capture screenshot for AI analysis
+- **Fn+⌘+D**: Clear chat history
+- **Fn+⌘+Q**: Quit application
+
+### Window Movement & Interaction
+
+- **Mouse Drag**: Click and drag the title bar area to move the window around the screen
+- **Window Resize**: Drag window edges to resize (min: 350x250, max: 1200x800)
+- **Window State Memory**: Window position and size are automatically remembered
+
+### Enhanced Interactions
+
+- **Message Context Menus**: Right-click messages for copy, delete, and info options
+- **Hover Effects**: Timestamps appear when hovering over messages
+- **Button Animations**: Visual feedback on all interactive elements
+- **Drag & Drop Files**: Drop text files or images directly into the input area
+- **Smart Loading States**: Animated indicators for all processing operations
 
 ### Configuration
 

@@ -12,85 +12,88 @@ import SwiftUI
 struct ControlBarView: View {
     @ObservedObject var viewModel: ConversationViewModel
     var showSettings: () -> Void
+    @State private var isHoveringWhisper = false
+    @State private var isHoveringScreenshot = false
     
     var body: some View {
         HStack(spacing: 16) {
-            // Whisper record button - minimal style
+            // Enhanced Whisper record button with animations
             Button(action: viewModel.toggleWhisperRecording) {
                 HStack(spacing: 8) {
-                    Image(systemName: viewModel.isWhisperRecording ? "stop.fill" : "waveform")
+                    Image(systemName: whisperIconName)
                         .font(.system(size: 14, weight: .light))
-                        .foregroundColor(
-                            viewModel.isWhisperRecording ? 
-                                JetBrainsTheme.error.opacity(0.8) : 
-                                JetBrainsTheme.textSecondary
-                        )
+                        .foregroundColor(whisperIconColor)
+                        .scaleEffect(viewModel.isWhisperRecording ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 0.15), value: viewModel.isWhisperRecording)
                     
-                    Text(viewModel.isWhisperRecording ? "STOP" : "WHISPER")
+                    Text(whisperButtonText)
                         .font(.system(size: 11, weight: .light, design: .monospaced))
                         .tracking(1)
-                        .foregroundColor(JetBrainsTheme.textSecondary)
+                        .foregroundColor(whisperTextColor)
+                    
+                    // Recording time display
+                    if viewModel.isWhisperRecording {
+                        Text(viewModel.whisperRecordingTime)
+                            .font(.system(size: 10, weight: .light, design: .monospaced))
+                            .foregroundColor(JetBrainsTheme.error.opacity(0.7))
+                            .transition(.opacity.combined(with: .slide))
+                    }
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 16)
-                .background(
-                    viewModel.isWhisperRecording ? 
-                        JetBrainsTheme.error.opacity(0.1) : 
-                        JetBrainsTheme.backgroundTertiary
-                )
+                .background(whisperBackgroundColor)
                 .cornerRadius(2)
                 .overlay(
                     RoundedRectangle(cornerRadius: 2)
-                        .stroke(
-                            viewModel.isWhisperRecording ? 
-                                JetBrainsTheme.error.opacity(0.3) : 
-                                JetBrainsTheme.border.opacity(0.3),
-                            lineWidth: 0.5
-                        )
+                        .stroke(whisperBorderColor, lineWidth: 0.5)
                 )
+                .scaleEffect(isHoveringWhisper ? 1.02 : 1.0)
+                .animation(.easeInOut(duration: 0.15), value: isHoveringWhisper)
             }
             .buttonStyle(PlainButtonStyle())
+            .onHover { hovering in
+                isHoveringWhisper = hovering
+            }
             .help("Record audio and transcribe with OpenAI Whisper (Fn+Cmd+R)")
             .accessibilityLabel(viewModel.isWhisperRecording ? "Stop recording" : "Start whisper recording")
             .accessibilityHint("Records audio and transcribes it using OpenAI Whisper")
             .accessibilityAddTraits(.isButton)
             
-            // Screenshot button - minimal style
+            // Enhanced Screenshot button with animations
             Button(action: viewModel.captureScreenshot) {
                 HStack(spacing: 8) {
-                    Image(systemName: viewModel.isProcessingScreenshot ? "hourglass" : "camera.fill")
+                    Image(systemName: screenshotIconName)
                         .font(.system(size: 14, weight: .light))
-                        .foregroundColor(
+                        .foregroundColor(screenshotIconColor)
+                        .rotationEffect(.degrees(viewModel.isProcessingScreenshot ? 360 : 0))
+                        .animation(
                             viewModel.isProcessingScreenshot ? 
-                                JetBrainsTheme.warning.opacity(0.8) : 
-                                JetBrainsTheme.textSecondary
+                                .linear(duration: 2).repeatForever(autoreverses: false) : 
+                                .default, 
+                            value: viewModel.isProcessingScreenshot
                         )
                     
-                    Text(viewModel.isProcessingScreenshot ? "PROCESSING" : "SCREENSHOT")
+                    Text(screenshotButtonText)
                         .font(.system(size: 11, weight: .light, design: .monospaced))
                         .tracking(1)
-                        .foregroundColor(JetBrainsTheme.textSecondary)
+                        .foregroundColor(screenshotTextColor)
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 16)
-                .background(
-                    viewModel.isProcessingScreenshot ? 
-                        JetBrainsTheme.warning.opacity(0.1) : 
-                        JetBrainsTheme.backgroundTertiary
-                )
+                .background(screenshotBackgroundColor)
                 .cornerRadius(2)
                 .overlay(
                     RoundedRectangle(cornerRadius: 2)
-                        .stroke(
-                            viewModel.isProcessingScreenshot ? 
-                                JetBrainsTheme.warning.opacity(0.3) : 
-                                JetBrainsTheme.border.opacity(0.3),
-                            lineWidth: 0.5
-                        )
+                        .stroke(screenshotBorderColor, lineWidth: 0.5)
                 )
+                .scaleEffect(isHoveringScreenshot ? 1.02 : 1.0)
+                .animation(.easeInOut(duration: 0.15), value: isHoveringScreenshot)
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(viewModel.isProcessingScreenshot)
+            .onHover { hovering in
+                isHoveringScreenshot = hovering && !viewModel.isProcessingScreenshot
+            }
             .help("Capture screen and analyze with GPT-4o (Fn+Cmd+P)")
             .accessibilityLabel(viewModel.isProcessingScreenshot ? "Processing screenshot" : "Capture screenshot")
             .accessibilityHint("Captures a screenshot and analyzes it using GPT-4o Vision")
@@ -118,7 +121,8 @@ struct ControlBarView: View {
                 ForEach([
                     ("FN+⌘+R", "WHISPER"),
                     ("FN+⌘+P", "SCREENSHOT"),
-                    ("FN+⌘+D", "CLEAR")
+                    ("FN+⌘+D", "CLEAR"),
+                    ("DRAG", "MOVE")
                 ], id: \.0) { shortcut, label in
                     HStack(spacing: 8) {
                         Text(shortcut)
@@ -134,5 +138,109 @@ struct ControlBarView: View {
             }
         }
         .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Enhanced UI Computed Properties
+    
+    // Whisper Button Properties
+    private var whisperIconName: String {
+        if viewModel.isWhisperRecording {
+            return "stop.fill"
+        } else {
+            return "waveform"
+        }
+    }
+    
+    private var whisperButtonText: String {
+        viewModel.isWhisperRecording ? "STOP" : "WHISPER"
+    }
+    
+    private var whisperIconColor: Color {
+        if viewModel.isWhisperRecording {
+            return JetBrainsTheme.error.opacity(0.8)
+        } else if isHoveringWhisper {
+            return JetBrainsTheme.accentPrimary.opacity(0.8)
+        } else {
+            return JetBrainsTheme.textSecondary
+        }
+    }
+    
+    private var whisperTextColor: Color {
+        if viewModel.isWhisperRecording {
+            return JetBrainsTheme.error.opacity(0.7)
+        } else if isHoveringWhisper {
+            return JetBrainsTheme.textPrimary.opacity(0.9)
+        } else {
+            return JetBrainsTheme.textSecondary
+        }
+    }
+    
+    private var whisperBackgroundColor: Color {
+        if viewModel.isWhisperRecording {
+            return JetBrainsTheme.error.opacity(0.1)
+        } else if isHoveringWhisper {
+            return JetBrainsTheme.accentPrimary.opacity(0.1)
+        } else {
+            return JetBrainsTheme.backgroundTertiary
+        }
+    }
+    
+    private var whisperBorderColor: Color {
+        if viewModel.isWhisperRecording {
+            return JetBrainsTheme.error.opacity(0.3)
+        } else if isHoveringWhisper {
+            return JetBrainsTheme.accentPrimary.opacity(0.3)
+        } else {
+            return JetBrainsTheme.border.opacity(0.3)
+        }
+    }
+    
+    // Screenshot Button Properties
+    private var screenshotIconName: String {
+        viewModel.isProcessingScreenshot ? "camera.rotate" : "camera.fill"
+    }
+    
+    private var screenshotButtonText: String {
+        viewModel.isProcessingScreenshot ? "PROCESSING" : "SCREENSHOT"
+    }
+    
+    private var screenshotIconColor: Color {
+        if viewModel.isProcessingScreenshot {
+            return JetBrainsTheme.warning.opacity(0.8)
+        } else if isHoveringScreenshot {
+            return JetBrainsTheme.accentPrimary.opacity(0.8)
+        } else {
+            return JetBrainsTheme.textSecondary
+        }
+    }
+    
+    private var screenshotTextColor: Color {
+        if viewModel.isProcessingScreenshot {
+            return JetBrainsTheme.warning.opacity(0.7)
+        } else if isHoveringScreenshot {
+            return JetBrainsTheme.textPrimary.opacity(0.9)
+        } else {
+            return JetBrainsTheme.textSecondary
+        }
+    }
+    
+    private var screenshotBackgroundColor: Color {
+        if viewModel.isProcessingScreenshot {
+            return JetBrainsTheme.warning.opacity(0.1)
+        } else if isHoveringScreenshot {
+            return JetBrainsTheme.accentPrimary.opacity(0.1)
+        } else {
+            return JetBrainsTheme.backgroundTertiary
+        }
+    }
+    
+    private var screenshotBorderColor: Color {
+        if viewModel.isProcessingScreenshot {
+            return JetBrainsTheme.warning.opacity(0.3)
+        } else if isHoveringScreenshot {
+            return JetBrainsTheme.accentPrimary.opacity(0.3)
+        } else {
+            return JetBrainsTheme.border.opacity(0.3)
+        }
     }
 }

@@ -138,8 +138,13 @@ class WindowManager: NSObject, WindowManagerProtocol {
         window.backgroundColor = NSColor.black.withAlphaComponent(0.0) // Fully transparent background
         window.isOpaque = false                          // Make the window not opaque
         
-        // Set minimum size constraint to maintain dimensions
-        window.minSize = NSSize(width: 400, height: 300)
+        // Set smart size constraints for better UX
+        window.minSize = NSSize(width: 350, height: 250)  // Smaller minimum for flexibility
+        window.maxSize = NSSize(width: 1200, height: 800) // Reasonable maximum size
+        
+        // Enable window restoration (remembers size/position)
+        window.isRestorable = true
+        window.identifier = NSUserInterfaceItemIdentifier("HiddenAIMainWindow")
         
         // Enforce content size
         window.setContentSize(NSSize(width: windowWidth, height: windowHeight))
@@ -231,21 +236,15 @@ class WindowManager: NSObject, WindowManagerProtocol {
                 // Handle app-level Fn+command shortcuts
                 switch event.keyCode {
                     case 11: // Fn+Cmd+B (window visibility)
-                        print("WindowManager passing Fn+Cmd+B to application")
                         return event
                     case 12: // Fn+Cmd+Q (quit)
                         return event
                     case 15: // Fn+Cmd+R (Whisper transcription)
-                        print("WindowManager passing Fn+Cmd+R to application")
                         return event
                     case 2: // Fn+Cmd+D (clear chat)
-                        print("WindowManager passing Fn+Cmd+D to application")
                         return event
-                    case 123, 124, 125, 126: // Arrow keys with Fn+Cmd for window movement
-                        if self.handleKeyEvent(event) {
-                            // If we handled the arrow key movement, don't pass it along
-                            return nil
-                        }
+                    case 123, 124, 125, 126: // Arrow keys - no longer used for window movement
+                        // Window movement is now handled by mouse drag in ConversationView
                         return event
                     default:
                         // For other Fn+command combinations in text fields, let them pass through
@@ -271,15 +270,9 @@ class WindowManager: NSObject, WindowManagerProtocol {
         globalKeyboardMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return }
             
-            // Only handle Fn+Command+Arrow combinations for window movement
-            if event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command) {
-                switch event.keyCode {
-                    case 123, 124, 125, 126: // Arrow keys
-                        self.handleKeyEvent(event)
-                    default:
-                        break
-                }
-            }
+            // Global monitor no longer handles arrow keys for window movement
+            // Window movement is now handled by mouse drag in ConversationView
+            // This monitor is kept for potential future global shortcuts
         }
         
         // Make the window key window to receive keyboard events
@@ -287,17 +280,15 @@ class WindowManager: NSObject, WindowManagerProtocol {
             window?.makeKey()
         }
         
-        print("WindowManager: Keyboard monitoring setup completed with Fn+Cmd+Arrow support")
+        print("WindowManager: Keyboard monitoring setup completed (window movement now via mouse drag)")
     }
     
     // Focus detection is no longer needed since we only use Command key combinations
     
     @discardableResult
     func handleKeyEvent(_ event: NSEvent) -> Bool {
-        guard let window = self.window else { return false }
-        
-        // Debug info
-        print("Key pressed in WindowManager: \(event.keyCode), flags: \(event.modifierFlags)")
+        // This method is now simplified since window movement is handled by mouse drag
+        // It's kept for future keyboard shortcuts that might be added
         
         // Pass specific Fn+command shortcuts to AppDelegate
         if event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command) {
@@ -318,48 +309,9 @@ class WindowManager: NSObject, WindowManagerProtocol {
                 print("WindowManager detected Fn+Cmd+D, allowing AppDelegate to handle it")
                 return false
             }
-            
-            // Handle Fn+Command+Arrow keys for window movement
-            // Only proceed if it's an arrow key
-            switch event.keyCode {
-                case 123, 124, 125, 126: // Arrow keys
-                    // Get current frame
-                    var frame = window.frame
-                    
-                    // Move window based on arrow key
-                    switch event.keyCode {
-                        case 123: // Left arrow
-                            print("Moving window left with Fn+Cmd+Left Arrow")
-                            frame.origin.x -= moveDistance
-                        case 124: // Right arrow
-                            print("Moving window right with Fn+Cmd+Right Arrow")
-                            frame.origin.x += moveDistance
-                        case 125: // Down arrow
-                            print("Moving window down with Fn+Cmd+Down Arrow")
-                            frame.origin.y -= moveDistance
-                        case 126: // Up arrow
-                            print("Moving window up with Fn+Cmd+Up Arrow")
-                            frame.origin.y += moveDistance
-                        default:
-                            return false
-                    }
-                    
-                    // Keep window within screen bounds
-                    if let screenFrame = NSScreen.main?.visibleFrame {
-                        // Make sure the window doesn't move completely off screen
-                        frame.origin.x = max(screenFrame.minX - frame.width + 100, min(frame.origin.x, screenFrame.maxX - 100))
-                        frame.origin.y = max(screenFrame.minY - frame.height + 100, min(frame.origin.y, screenFrame.maxY - 100))
-                    }
-                    
-                    // Set new frame (which moves the window)
-                    window.setFrame(frame, display: true)
-                    return true
-                default:
-                    break
-            }
         }
         
-        // We only handle Fn+Cmd+Arrow combinations now
+        // No special handling needed for other keys
         return false
     }
     

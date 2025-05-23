@@ -26,6 +26,9 @@ struct JetBrainsTheme {
     /// Secondary accent color (muted purple)
     static let accentSecondary = Color(hex: "#6B5B95")
     
+    /// Main accent color (alias for accentPrimary)
+    static let accentColor = accentPrimary
+    
     /// Primary text color (slightly dimmed white)
     static let textPrimary = Color(hex: "#E0E0E0")
     

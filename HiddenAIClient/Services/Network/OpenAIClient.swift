@@ -416,7 +416,6 @@ class OpenAIClient: OpenAIClientProtocol {
                 return
             }
         } catch {
-            print("Error checking file size: \(error)")
             // Continue anyway, don't fail here
         }
         
@@ -475,7 +474,6 @@ class OpenAIClient: OpenAIClientProtocol {
                     
                     // Handle explicit cancellation error more gracefully
                     if let error = error as NSError?, error.code == NSURLErrorCancelled {
-                        print("Request was cancelled, possibly due to app state transition")
                         let cancelError = NSError(domain: "OpenAIClient", 
                                                 code: NSURLErrorCancelled,
                                                 userInfo: [NSLocalizedDescriptionKey: "Request was cancelled"])
@@ -485,11 +483,7 @@ class OpenAIClient: OpenAIClientProtocol {
                     
                     // Handle other network errors with retry logic
                     if let error = error {
-                        print("Network error: \(error.localizedDescription)")
-                        
                         if retryCount < maxRetries {
-                            print("Retrying transcription request (\(retryCount + 1)/\(maxRetries))")
-                            
                             // Exponential backoff - wait longer between each retry
                             let delay = Double(pow(2.0, Double(retryCount))) * 0.5
                             DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
@@ -497,7 +491,6 @@ class OpenAIClient: OpenAIClientProtocol {
                             }
                             return
                         } else {
-                            print("Max retries reached, failing with error")
                             completion(.failure(error))
                             return
                         }
@@ -773,14 +766,22 @@ class OpenAIClient: OpenAIClientProtocol {
     
     func sendRequest(prompt: String) async throws -> String {
         return try await withCheckedThrowingContinuation { continuation in
-            sendRequest(prompt: prompt) { result in
-                continuation.resume(with: result)
+            // Use sendMessage directly to avoid notification posting
+            sendMessage(prompt) { response, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let response = response {
+                    continuation.resume(returning: response)
+                } else {
+                    continuation.resume(throwing: NSError(domain: "OpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "Unknown error"]))
+                }
             }
         }
     }
     
     func sendRequestWithContext(prompt: String, contextMessages: [Message]) async throws -> String {
         return try await withCheckedThrowingContinuation { continuation in
+            // Call the legacy method but handle the result directly to avoid notifications
             sendRequestWithContext(prompt: prompt, contextMessages: contextMessages) { result in
                 continuation.resume(with: result)
             }

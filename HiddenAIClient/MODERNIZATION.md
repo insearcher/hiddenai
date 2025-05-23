@@ -8,7 +8,25 @@ The project has been systematically refactored to incorporate current iOS/macOS 
 
 ## Key Improvements Implemented
 
-### 1. Async/Await Migration ✅
+### 1. Intuitive Mouse Drag Window Movement ✅
+
+**Problem Solved:**
+- Keyboard-based window movement (`Cmd+Arrow`) was conflicting with system key mappings
+- Users expected standard drag-to-move functionality
+
+**Implementation:**
+- Added mouse drag gesture to the window title bar area
+- Implemented smooth window movement with screen boundary constraints
+- Separated draggable area (title) from interactive elements (buttons)
+- Removed problematic keyboard-based window movement
+
+**Benefits:**
+- **Intuitive UX**: Users can now drag the window like any standard macOS app
+- **No Keyboard Conflicts**: Eliminated keyboard mapping issues
+- **Better Accessibility**: Mouse-based movement is more accessible than complex key combinations
+- **Standard Behavior**: Follows macOS Human Interface Guidelines
+
+### 2. Async/Await Migration ✅
 
 **Before:**
 ```swift
@@ -121,6 +139,37 @@ container.register(OpenAIClientProtocol.self) {
 let client = try container.resolveRequired(OpenAIClientProtocol.self)
 ```
 
+### 7. Advanced UX Improvements ✅
+
+**Window Management:**
+- Smart window resizing with proper constraints (350x250 to 1200x800)
+- Window state persistence (remembers position/size between sessions)
+- Window restoration with unique identifier for macOS integration
+
+**Visual Feedback & Animations:**
+- Hover effects on all interactive elements
+- Button scale and color animations
+- Loading state animations with rotating icons
+- Smooth transitions for state changes
+
+**Enhanced Message Interactions:**
+- Right-click context menus with copy, delete, and info options
+- Hover timestamps that appear dynamically
+- Message deletion with confirmation dialogs
+- Raw text copying alongside formatted content
+
+**Drag & Drop Functionality:**
+- File drop support for text files, code files, and images
+- Visual drag target feedback with color changes
+- Smart file type detection and handling
+- Auto-focus input after file drop
+
+**Smart Loading States:**
+- Recording time display during Whisper sessions
+- Rotating camera icon during screenshot processing
+- Color-coded status indicators (error=red, warning=yellow, active=blue)
+- Smooth scale animations on hover
+
 ## Architecture Improvements
 
 ### Service Layer Modernization
@@ -212,6 +261,14 @@ The project now builds successfully with all modernization improvements applied.
 - **Type Safety**: Fixed dictionary type mismatches in network requests  
 - **Dependency Injection**: Updated DI container to handle async service creation
 - **Error Handling**: Resolved pattern matching in structured error types
+
+## Bug Fixes ✅
+
+**Duplicate Response Issue Resolved:**
+- **Problem**: App was responding twice to every message due to both async methods and notification observers adding responses
+- **Root Cause**: Async wrapper methods were calling legacy callback methods that post notifications, while ViewModel was also handling responses directly
+- **Solution**: Modified async `sendRequest` to call `sendMessage` directly, bypassing notification posting
+- **Result**: Clean single response per message with no duplication
 
 ## Conclusion
 

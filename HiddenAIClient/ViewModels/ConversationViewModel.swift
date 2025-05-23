@@ -40,8 +40,11 @@ enum ProcessingStage: CaseIterable {
 final class ConversationViewModel: ObservableObject {
     // MARK: - Published Properties
     
-    /// Messages displayed in the conversation
-    @Published var messages: [Message] = []
+    /// Conversation tabs containing question-answer pairs
+    @Published var conversationTabs: [ConversationTab] = []
+    
+    /// Currently selected tab index
+    @Published var selectedTabIndex: Int = 0
     
     /// Current processing stage
     @Published var processingStage: ProcessingStage = .none
@@ -69,13 +72,10 @@ final class ConversationViewModel: ObservableObject {
     /// Path to the last captured screenshot
     @Published var screenshotPath: String? = nil
     
-    /// Whether to automatically scroll to the bottom
+    // Legacy properties for compatibility (will be removed)
+    @Published var messages: [Message] = []
     @Published var scrollToBottom: Bool = true
-    
-    /// ID of the latest message for scrolling
     @Published var latestMessageId: UUID? = nil
-    
-    /// Whether to show the scroll to bottom button
     @Published var showScrollToButton: Bool = false
     
     // MARK: - Dependencies
@@ -127,7 +127,9 @@ final class ConversationViewModel: ObservableObject {
     
     /// Clear the conversation
     func clearConversation() {
-        messages.removeAll()
+        conversationTabs.removeAll()
+        selectedTabIndex = 0
+        messages.removeAll() // Keep for compatibility
         openAIClient.clearConversation()
     }
     
@@ -188,22 +190,58 @@ final class ConversationViewModel: ObservableObject {
         )
         
         DispatchQueue.main.async {
+            // Legacy compatibility
             self.messages.append(message)
-            
-            // Set the latest message ID for scrolling
             self.latestMessageId = message.id
             
-            // Re-enable auto-scrolling when a new user message is added
-            // This ensures new conversations start with auto-scroll enabled
+            // Handle tabbed interface
             if type == .user {
+                // Create a new tab for user message
+                let newTab = ConversationTab(userMessage: message)
+                self.conversationTabs.append(newTab)
+                self.selectedTabIndex = self.conversationTabs.count - 1
                 self.scrollToBottom = true
+            } else if type == .assistant {
+                // Add assistant response to the latest tab
+                if !self.conversationTabs.isEmpty {
+                    let lastTabIndex = self.conversationTabs.count - 1
+                    let currentTab = self.conversationTabs[lastTabIndex]
+                    let updatedTab = ConversationTab(
+                        userMessage: currentTab.userMessage,
+                        assistantMessage: message,
+                        timestamp: currentTab.timestamp
+                    )
+                    self.conversationTabs[lastTabIndex] = updatedTab
+                }
             }
         }
         
         return message.id
     }
     
-    /// Process text input or transcription using modern async/await
+    /// Select a specific tab
+    func selectTab(at index: Int) {
+        guard index >= 0 && index < conversationTabs.count else { return }
+        selectedTabIndex = index
+    }
+    
+    /// Get the currently selected tab
+    var currentTab: ConversationTab? {
+        guard selectedTabIndex >= 0 && selectedTabIndex < conversationTabs.count else { return nil }
+        return conversationTabs[selectedTabIndex]
+    }
+    
+    /// Get messages for the current tab
+    var currentTabMessages: [Message] {
+        guard let tab = currentTab else { return [] }
+        var messages = [tab.userMessage]
+        if let assistantMessage = tab.assistantMessage {
+            messages.append(assistantMessage)
+        }
+        return messages
+    }
+    
+    /// Process text input or transcription using async method (no duplicate responses)
     /// - Parameter text: The text to process
     private func processTranscription(_ text: String) {
         // Add the user's message to the conversation
@@ -227,34 +265,6 @@ final class ConversationViewModel: ObservableObject {
                         self.processingStage = .none
                     }
                 }
-            }
-        } else {
-            addMessage("Please set your OpenAI API key in settings to receive responses.", type: .assistant)
-        }
-    }
-    
-    /// Legacy process method for callback-based operations
-    private func processTranscriptionLegacy(_ text: String) {
-        // Add the user's message to the conversation
-        addMessage(text, type: .user)
-        
-        // Send to OpenAI for processing
-        if openAIClient.hasApiKey {
-            processingStage = .openAIProcessing
-            
-            // Send a regular request - no reply context needed
-            openAIClient.sendRequest(prompt: text) { [weak self] result in
-                // Only handle failures in the completion handler
-                // Success responses are handled by the notification observer
-                if case .failure(let error) = result {
-                    DispatchQueue.main.async {
-                        let aiError = AIServiceError.from(error)
-                        self?.addMessage(aiError.localizedDescription, type: .assistant)
-                        self?.processingStage = .none
-                    }
-                }
-                // We don't set processingStage = .none for success case 
-                // as the notification handler will do that
             }
         } else {
             addMessage("Please set your OpenAI API key in settings to receive responses.", type: .assistant)
@@ -398,16 +408,15 @@ final class ConversationViewModel: ObservableObject {
             }
         )
         
-        // OpenAI API responses
+        // OpenAI API responses (legacy notification - now only used for stopping processing indicators)
         addNotificationObserver(
             forName: Notification.Name("OpenAIResponseReceived"),
             handler: { [weak self] notification in
                 if let userInfo = notification.object as? [String: Any],
-                   let response = userInfo["response"] as? String {
+                   let _ = userInfo["response"] as? String {
                     DispatchQueue.main.async {
-                        self?.addMessage(response, type: .assistant)
-                        
-                        // Always stop processing indicators after a response
+                        // NOTE: Message adding is now handled by async methods directly
+                        // Only handle processing state cleanup here
                         self?.processingStage = .none
                         self?.isProcessingScreenshot = false
                     }

@@ -12,6 +12,11 @@ import AppKit
 struct MessageView: View {
     let message: Message
     @State private var copiedIndex: Int? = nil
+    @State private var isHovering = false
+    @State private var showingDeleteConfirmation = false
+    
+    // Callback for message deletion
+    var onDelete: ((Message) -> Void)?
     
     var body: some View {
         HStack {
@@ -111,12 +116,76 @@ struct MessageView: View {
                 Spacer(minLength: 60)
             }
         }
+        .overlay(
+            // Hover timestamp overlay
+            VStack {
+                HStack {
+                    if message.type == .user {
+                        Spacer()
+                    }
+                    
+                    if isHovering {
+                        Text(formattedTime(for: message.timestamp))
+                            .font(.system(size: 11, weight: .light, design: .monospaced))
+                            .foregroundColor(JetBrainsTheme.textSecondary.opacity(0.6))
+                            .padding(4)
+                            .background(JetBrainsTheme.backgroundSecondary.opacity(0.8))
+                            .cornerRadius(2)
+                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                    }
+                    
+                    if message.type == .assistant {
+                        Spacer()
+                    }
+                }
+                Spacer()
+            }
+            .animation(.easeInOut(duration: 0.2), value: isHovering)
+        )
+        .onHover { hovering in
+            isHovering = hovering
+        }
         .contextMenu {
+            // Copy actions
             Button(action: {
                 copyMessageContent()
             }) {
                 Label("Copy Message", systemImage: "doc.on.doc")
             }
+            
+            Button(action: {
+                copyRawContent()
+            }) {
+                Label("Copy as Plain Text", systemImage: "textformat")
+            }
+            
+            Divider()
+            
+            // Message info
+            Button(action: {
+                showMessageInfo()
+            }) {
+                Label("Message Info", systemImage: "info.circle")
+            }
+            
+            if message.type == .user {
+                Divider()
+                
+                // Delete option (only for user messages to avoid confusion)
+                Button(action: {
+                    showingDeleteConfirmation = true
+                }) {
+                    Label("Delete Message", systemImage: "trash")
+                }
+            }
+        }
+        .alert("Delete Message", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                onDelete?(message)
+            }
+        } message: {
+            Text("Are you sure you want to delete this message? This action cannot be undone.")
         }
     }
     
@@ -143,5 +212,38 @@ struct MessageView: View {
         }.joined(separator: "\n\n")
         
         copyToClipboard(fullText)
+    }
+    
+    // MARK: - Enhanced Context Menu Actions
+    
+    private func copyRawContent() {
+        let rawContent = message.contents.map { content in
+            content.content // Just the raw text without markdown formatting
+        }.joined(separator: "\n\n")
+        
+        copyToClipboard(rawContent)
+    }
+    
+    private func showMessageInfo() {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+        
+        let messageLength = message.contents.reduce(0) { total, content in
+            total + content.content.count
+        }
+        
+        let info = """
+        Message ID: \(message.id.uuidString.prefix(8))...
+        Type: \(message.type == .user ? "User" : "Assistant")
+        Timestamp: \(formatter.string(from: message.timestamp))
+        Content Length: \(messageLength) characters
+        Content Parts: \(message.contents.count)
+        """
+        
+        copyToClipboard(info)
+        
+        // Show a brief notification (we could enhance this with a proper toast)
+        print("Message info copied to clipboard")
     }
 }
