@@ -16,6 +16,8 @@ enum ProcessingStage: CaseIterable {
     case whisperProcessing
     case openAIProcessing
     case screenshot
+    case screenshotCapturing
+    case screenshotAnalyzing
     
     var displayText: String {
         switch self {
@@ -29,6 +31,10 @@ enum ProcessingStage: CaseIterable {
             return "Processing: OpenAI"
         case .screenshot:
             return "Processing: Screenshot"
+        case .screenshotCapturing:
+            return "Capturing screenshot..."
+        case .screenshotAnalyzing:
+            return "Analyzing screenshot..."
         }
     }
     
@@ -165,13 +171,13 @@ final class ConversationViewModel: ObservableObject {
         }
         
         isProcessingScreenshot = true
-        processingStage = .screenshot
+        processingStage = .screenshotCapturing
         
         // Request screenshot capture through notification
         notificationService.post(name: .captureScreenshotRequested, object: nil)
         
-        // Add a message to indicate we're processing
-        addMessage("Capturing and analyzing screenshot...", type: .user)
+        // Don't add a permanent message - let the processing indicator handle the UI
+        // The actual screenshot content will be added when we get the OpenAI response
     }
     
     // MARK: - Message Handling
@@ -283,7 +289,10 @@ final class ConversationViewModel: ObservableObject {
                    let path = userInfo["path"] {
                     DispatchQueue.main.async {
                         self?.screenshotPath = path
-                        print("Screenshot captured at path: \(path)")
+                        // Update processing stage to analyzing
+                        self?.processingStage = .screenshotAnalyzing
+                        // Add a user message indicating that a screenshot was taken and is being analyzed
+                        self?.addMessage("📷 Screenshot captured", type: .user)
                     }
                 }
             }
@@ -294,11 +303,7 @@ final class ConversationViewModel: ObservableObject {
             handler: { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.isProcessingScreenshot = true
-                    
-                    // Optionally add the processing message if it doesn't exist yet
-                    if !(self?.messages.contains(where: { $0.contents.first?.content.contains("Capturing and analyzing screenshot") == true }) ?? false) {
-                        self?.addMessage("Capturing and analyzing screenshot...", type: .user)
-                    }
+                    // Processing indicator is now handled by the screenshot capture notification
                 }
             }
         )

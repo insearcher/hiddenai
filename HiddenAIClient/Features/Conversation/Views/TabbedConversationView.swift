@@ -26,8 +26,8 @@ struct TabbedConversationView: View {
             
             // Content area
             ZStack {
-                if viewModel.conversationTabs.isEmpty {
-                    // Empty state
+                if viewModel.conversationTabs.isEmpty && !viewModel.isProcessing {
+                    // Empty state (only when not processing)
                     VStack(spacing: 12) {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .font(.system(size: 48, weight: .ultraLight))
@@ -40,6 +40,17 @@ struct TabbedConversationView: View {
                         Text("Type a message or use voice recording")
                             .font(.system(size: 14, weight: .light))
                             .foregroundColor(JetBrainsTheme.textSecondary.opacity(0.5))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(JetBrainsTheme.backgroundPrimary)
+                } else if viewModel.conversationTabs.isEmpty && viewModel.isProcessing {
+                    // Processing state when no tabs exist yet
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text(viewModel.processingStage.displayText)
+                            .font(.system(size: 16, weight: .light))
+                            .foregroundColor(JetBrainsTheme.textSecondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(JetBrainsTheme.backgroundPrimary)
