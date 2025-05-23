@@ -13,55 +13,51 @@ struct InputBarView: View {
     @FocusState var isInputFocused: Bool
     
     var body: some View {
-        VStack(spacing: 10) {
-            // API key warning if needed
+        VStack(spacing: 8) {
+            // API key warning if needed - minimal style
             if !viewModel.apiKeyIsSet {
-                Text("OpenAI API key not set. Click Settings to configure.")
-                    .font(.system(size: 13))
-                    .foregroundColor(JetBrainsTheme.warning)
-                    .padding(8)
+                Text("API KEY NOT CONFIGURED")
+                    .font(.system(size: 11, weight: .light, design: .monospaced))
+                    .foregroundColor(JetBrainsTheme.warning.opacity(0.8))
+                    .tracking(1)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 12)
                     .background(JetBrainsTheme.warning.opacity(0.1))
-                    .cornerRadius(4)
+                    .cornerRadius(2)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(JetBrainsTheme.warning.opacity(0.5), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 2)
+                            .stroke(JetBrainsTheme.warning.opacity(0.3), lineWidth: 0.5)
                     )
-                    .padding(.horizontal)
+                    .padding(.horizontal, 20)
             }
             
-            // Text input field and send button
-            HStack(spacing: 8) {
-                TextField("Type your message...", text: $viewModel.inputText)
-                    .font(.system(size: 14))
-                    .padding(10)
+            // Minimal text input field and send button
+            HStack(spacing: 12) {
+                TextField("", text: $viewModel.inputText, prompt: Text("Type message...")
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundColor(JetBrainsTheme.textSecondary.opacity(0.6)))
+                    .font(.system(size: 14, weight: .light))
+                    .padding(12)
                     .background(JetBrainsTheme.backgroundTertiary)
-                    .cornerRadius(6)
+                    .cornerRadius(2)
                     .foregroundColor(JetBrainsTheme.textPrimary)
                     .submitLabel(.send)
                     .focused($isInputFocused)
                     .onTapGesture {
-                        // Ensure field gets focused when tapped
                         isInputFocused = true
-                        print("Text field tapped, setting focus")
                     }
                     .onChange(of: isInputFocused) { _, focused in
-                        // Notify about focus state changes
                         NotificationCenter.default.post(
                             name: .textFieldFocusChanged,
                             object: ["focused": focused]
                         )
-                        print("Text input focus changed: \(focused)")
                         
-                        // If losing focus unexpectedly, try to regain it
                         if !focused {
-                            // Add a short delay before trying to refocus
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                // Only try to refocus if we're not currently in a different text field
                                 if let window = NSApplication.shared.keyWindow,
                                    !(window.firstResponder is NSTextField) && 
                                    !(window.firstResponder is NSTextView) {
                                     isInputFocused = true
-                                    print("Auto-refocusing text field")
                                 }
                             }
                         }
@@ -70,27 +66,39 @@ struct InputBarView: View {
                         viewModel.sendTextMessage()
                     }
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(isInputFocused ? JetBrainsTheme.accentPrimary : JetBrainsTheme.border, lineWidth: isInputFocused ? 1.5 : 1)
+                        RoundedRectangle(cornerRadius: 2)
+                            .stroke(
+                                isInputFocused ? 
+                                    JetBrainsTheme.accentPrimary.opacity(0.5) : 
+                                    JetBrainsTheme.border.opacity(0.3), 
+                                lineWidth: 0.5
+                            )
                     )
-                    .animation(.easeInOut(duration: 0.2), value: isInputFocused)
+                    .animation(.easeInOut(duration: 0.15), value: isInputFocused)
                 
-                // Send button
+                // Minimal send button
                 Button(action: viewModel.sendTextMessage) {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(JetBrainsTheme.textPrimary)
-                        .padding(10)
-                        .background(JetBrainsTheme.accentPrimary)
-                        .cornerRadius(6)
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundColor(
+                            viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 
+                                JetBrainsTheme.textSecondary.opacity(0.4) : 
+                                JetBrainsTheme.textPrimary.opacity(0.9)
+                        )
+                        .frame(width: 36, height: 36)
+                        .background(
+                            viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 
+                                JetBrainsTheme.backgroundTertiary : 
+                                JetBrainsTheme.accentPrimary.opacity(0.6)
+                        )
+                        .cornerRadius(2)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isProcessing)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
         }
         .onAppear {
-            // Set focus to the input field when the view appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isInputFocused = true
             }

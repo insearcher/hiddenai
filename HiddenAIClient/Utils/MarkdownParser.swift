@@ -16,10 +16,10 @@ struct MarkdownParser {
         let attributedString = NSMutableAttributedString(string: text)
         let fullRange = NSRange(location: 0, length: attributedString.length)
         
-        // Apply base styling
-        let font = NSFont.systemFont(ofSize: 14)
+        // Apply base styling - light weight for austere look
+        let font = NSFont.systemFont(ofSize: 14, weight: .light)
         attributedString.addAttribute(.font, value: font, range: fullRange)
-        attributedString.addAttribute(.foregroundColor, value: NSColor.white, range: fullRange)
+        attributedString.addAttribute(.foregroundColor, value: NSColor(red: 0.88, green: 0.88, blue: 0.88, alpha: 1.0), range: fullRange)
         
         // Apply styling for each Markdown element
         processBoldText(in: attributedString)
@@ -57,8 +57,8 @@ struct MarkdownParser {
                 let contentText = (attrString.string as NSString).substring(with: contentRange)
                 let boldText = NSMutableAttributedString(string: contentText)
                 
-                // Apply bold font
-                let boldFont = NSFont.boldSystemFont(ofSize: 14)
+                // Apply medium weight font for austere bold
+                let boldFont = NSFont.systemFont(ofSize: 14, weight: .medium)
                 boldText.addAttribute(.font, value: boldFont, range: NSRange(location: 0, length: boldText.length))
                 
                 // Replace in the original string
@@ -89,7 +89,7 @@ struct MarkdownParser {
                 let italicText = NSMutableAttributedString(string: contentText)
                 
                 // Apply italic font
-                let italicFont = NSFont.systemFont(ofSize: 14).withItalicTrait()
+                let italicFont = NSFont.systemFont(ofSize: 14, weight: .light).withItalicTrait()
                 italicText.addAttribute(.font, value: italicFont, range: NSRange(location: 0, length: italicText.length))
                 
                 // Replace in the original string
@@ -117,14 +117,14 @@ struct MarkdownParser {
             let codeText = NSMutableAttributedString(string: contentText)
             
             // Apply monospaced font and styling
-            let codeFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+            let codeFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .light)
             codeText.addAttribute(.font, value: codeFont, range: NSRange(location: 0, length: codeText.length))
             
-            // Use a slightly different color
-            codeText.addAttribute(.foregroundColor, value: NSColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1.0), range: NSRange(location: 0, length: codeText.length))
+            // Use a muted color
+            codeText.addAttribute(.foregroundColor, value: NSColor(red: 0.6, green: 0.65, blue: 0.7, alpha: 1.0), range: NSRange(location: 0, length: codeText.length))
             
-            // Add light background
-            codeText.addAttribute(.backgroundColor, value: NSColor(white: 0.2, alpha: 0.5), range: NSRange(location: 0, length: codeText.length))
+            // Very subtle background
+            codeText.addAttribute(.backgroundColor, value: NSColor(white: 0.15, alpha: 0.5), range: NSRange(location: 0, length: codeText.length))
             
             // Replace in the original string
             attrString.replaceCharacters(in: wholeRange, with: codeText)
@@ -153,25 +153,25 @@ struct MarkdownParser {
             let contentText = (attrString.string as NSString).substring(with: contentRange)
             let headingText = NSMutableAttributedString(string: contentText)
             
-            // Choose size and weight based on heading level
+            // Choose size and weight based on heading level - more subtle differences
             let fontSize: CGFloat
             let fontWeight: NSFont.Weight
             
             switch hashCount {
-            case 1: fontSize = 24; fontWeight = .bold
-            case 2: fontSize = 22; fontWeight = .bold
-            case 3: fontSize = 20; fontWeight = .bold
-            case 4: fontSize = 18; fontWeight = .semibold
-            case 5: fontSize = 16; fontWeight = .semibold
-            default: fontSize = 15; fontWeight = .semibold
+            case 1: fontSize = 18; fontWeight = .regular
+            case 2: fontSize = 17; fontWeight = .regular
+            case 3: fontSize = 16; fontWeight = .regular
+            case 4: fontSize = 15; fontWeight = .light
+            case 5: fontSize = 14; fontWeight = .light
+            default: fontSize = 14; fontWeight = .light
             }
             
             let headingFont = NSFont.systemFont(ofSize: fontSize, weight: fontWeight)
             headingText.addAttribute(.font, value: headingFont, range: NSRange(location: 0, length: headingText.length))
             
-            // Add a bit of extra space after headings
+            // Add minimal spacing
             let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.paragraphSpacing = 8
+            paragraphStyle.paragraphSpacing = 6
             headingText.addAttribute(.paragraphStyle, value: paragraphStyle, range: NSRange(location: 0, length: headingText.length))
             
             // Replace in the original string
@@ -196,11 +196,11 @@ struct MarkdownParser {
             // Extract content
             let contentText = (attrString.string as NSString).substring(with: contentRange)
             
-            // Create bullet point item
-            let bulletItem = NSMutableAttributedString(string: "• ")
+            // Create bullet point item with minimal bullet
+            let bulletItem = NSMutableAttributedString(string: "· ")
             
-            // Style the bullet itself
-            bulletItem.addAttribute(.foregroundColor, value: NSColor.lightGray, range: NSRange(location: 0, length: bulletItem.length))
+            // Style the bullet itself - very muted
+            bulletItem.addAttribute(.foregroundColor, value: NSColor(white: 0.5, alpha: 1.0), range: NSRange(location: 0, length: bulletItem.length))
             
             // Add the content text
             let contentItem = NSMutableAttributedString(string: contentText)
@@ -217,11 +217,11 @@ struct MarkdownParser {
             
             bulletItem.append(contentItem)
             
-            // Add indentation
+            // Add minimal indentation
             let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.headIndent = 15
+            paragraphStyle.headIndent = 12
             paragraphStyle.firstLineHeadIndent = 0
-            paragraphStyle.paragraphSpacing = 4
+            paragraphStyle.paragraphSpacing = 2
             bulletItem.addAttribute(.paragraphStyle, value: paragraphStyle, range: NSRange(location: 0, length: bulletItem.length))
             
             // Replace in the original string
@@ -251,8 +251,8 @@ struct MarkdownParser {
             // Create numbered item
             let numberedItem = NSMutableAttributedString(string: "\(number). ")
             
-            // Style the number
-            numberedItem.addAttribute(.foregroundColor, value: NSColor.lightGray, range: NSRange(location: 0, length: numberedItem.length))
+            // Style the number - very muted
+            numberedItem.addAttribute(.foregroundColor, value: NSColor(white: 0.5, alpha: 1.0), range: NSRange(location: 0, length: numberedItem.length))
             
             // Add the content text
             let contentItem = NSMutableAttributedString(string: contentText)
@@ -269,11 +269,11 @@ struct MarkdownParser {
             
             numberedItem.append(contentItem)
             
-            // Add indentation
+            // Add minimal indentation
             let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.headIndent = 20
+            paragraphStyle.headIndent = 16
             paragraphStyle.firstLineHeadIndent = 0
-            paragraphStyle.paragraphSpacing = 4
+            paragraphStyle.paragraphSpacing = 2
             numberedItem.addAttribute(.paragraphStyle, value: paragraphStyle, range: NSRange(location: 0, length: numberedItem.length))
             
             // Replace in the original string
@@ -303,9 +303,10 @@ struct MarkdownParser {
             // Create hyperlink text
             let linkItem = NSMutableAttributedString(string: linkText)
             
-            // Style as link
-            linkItem.addAttribute(.foregroundColor, value: NSColor(red: 0.4, green: 0.6, blue: 1.0, alpha: 1.0), range: NSRange(location: 0, length: linkItem.length))
+            // Style as link - muted blue
+            linkItem.addAttribute(.foregroundColor, value: NSColor(red: 0.5, green: 0.6, blue: 0.8, alpha: 1.0), range: NSRange(location: 0, length: linkItem.length))
             linkItem.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: NSRange(location: 0, length: linkItem.length))
+            linkItem.addAttribute(.underlineColor, value: NSColor(red: 0.5, green: 0.6, blue: 0.8, alpha: 0.5), range: NSRange(location: 0, length: linkItem.length))
             
             // Add link URL if valid
             if let url = URL(string: urlString) {
