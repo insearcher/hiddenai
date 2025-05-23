@@ -768,4 +768,38 @@ class OpenAIClient: OpenAIClientProtocol {
             )
         }
     }
+    
+    // MARK: - Async API Methods (Modern Implementation)
+    
+    func sendRequest(prompt: String) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            sendRequest(prompt: prompt) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+    
+    func sendRequestWithContext(prompt: String, contextMessages: [Message]) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            sendRequestWithContext(prompt: prompt, contextMessages: contextMessages) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+    
+    func transcribeAudio(fileURL: URL) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            transcribeAudio(fileURL: fileURL) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+    
+    func sendImageRequest(imageURL: URL, prompt: String, contextInfo: [String: Any]?) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            sendImageRequest(imageURL: imageURL, prompt: prompt, contextInfo: contextInfo) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
 }

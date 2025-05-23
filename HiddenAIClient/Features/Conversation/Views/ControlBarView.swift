@@ -51,6 +51,9 @@ struct ControlBarView: View {
             }
             .buttonStyle(PlainButtonStyle())
             .help("Record audio and transcribe with OpenAI Whisper (Fn+Cmd+R)")
+            .accessibilityLabel(viewModel.isWhisperRecording ? "Stop recording" : "Start whisper recording")
+            .accessibilityHint("Records audio and transcribes it using OpenAI Whisper")
+            .accessibilityAddTraits(.isButton)
             
             // Screenshot button - minimal style
             Button(action: viewModel.captureScreenshot) {
@@ -89,6 +92,9 @@ struct ControlBarView: View {
             .buttonStyle(PlainButtonStyle())
             .disabled(viewModel.isProcessingScreenshot)
             .help("Capture screen and analyze with GPT-4o (Fn+Cmd+P)")
+            .accessibilityLabel(viewModel.isProcessingScreenshot ? "Processing screenshot" : "Capture screenshot")
+            .accessibilityHint("Captures a screenshot and analyzes it using GPT-4o Vision")
+            .accessibilityAddTraits(viewModel.isProcessingScreenshot ? [] : .isButton)
             
             // Processing indicator - minimal
             if viewModel.processingStage != .none {

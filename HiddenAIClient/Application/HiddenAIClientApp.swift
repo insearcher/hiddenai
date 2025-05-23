@@ -549,8 +549,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
         
         // Get the conversation view model and clear the conversation
         if let viewModel = DIContainer.shared.resolve(ConversationViewModel.self) {
-            viewModel.clearConversation()
-            print("Chat history cleared successfully")
+            DispatchQueue.main.async {
+                viewModel.clearConversation()
+                print("Chat history cleared successfully")
+            }
         } else {
             print("ERROR: Could not resolve ConversationViewModel to clear chat")
         }

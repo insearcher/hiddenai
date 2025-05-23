@@ -10,7 +10,7 @@ import SwiftUI
 import Combine
 
 /// Represents different processing stages
-enum ProcessingStage {
+enum ProcessingStage: CaseIterable {
     case none
     case whisperRecording
     case whisperProcessing
@@ -31,9 +31,13 @@ enum ProcessingStage {
             return "Processing: Screenshot"
         }
     }
+    
+    var isProcessing: Bool {
+        self != .none
+    }
 }
 
-class ConversationViewModel: ObservableObject {
+final class ConversationViewModel: ObservableObject {
     // MARK: - Published Properties
     
     /// Messages displayed in the conversation
@@ -44,7 +48,7 @@ class ConversationViewModel: ObservableObject {
     
     /// Computed property for backward compatibility
     var isProcessing: Bool {
-        return processingStage != .none
+        return processingStage.isProcessing
     }
     
     /// Whether the API key is set
@@ -199,9 +203,38 @@ class ConversationViewModel: ObservableObject {
         return message.id
     }
     
-    /// Process text input or transcription
+    /// Process text input or transcription using modern async/await
     /// - Parameter text: The text to process
     private func processTranscription(_ text: String) {
+        // Add the user's message to the conversation
+        addMessage(text, type: .user)
+        
+        // Send to OpenAI for processing
+        if openAIClient.hasApiKey {
+            processingStage = .openAIProcessing
+            
+            Task {
+                do {
+                    let response = try await openAIClient.sendRequest(prompt: text)
+                    DispatchQueue.main.async {
+                        self.addMessage(response, type: .assistant)
+                        self.processingStage = .none
+                    }
+                } catch {
+                    let aiError = AIServiceError.from(error)
+                    DispatchQueue.main.async {
+                        self.addMessage(aiError.localizedDescription, type: .assistant)
+                        self.processingStage = .none
+                    }
+                }
+            }
+        } else {
+            addMessage("Please set your OpenAI API key in settings to receive responses.", type: .assistant)
+        }
+    }
+    
+    /// Legacy process method for callback-based operations
+    private func processTranscriptionLegacy(_ text: String) {
         // Add the user's message to the conversation
         addMessage(text, type: .user)
         
@@ -215,7 +248,8 @@ class ConversationViewModel: ObservableObject {
                 // Success responses are handled by the notification observer
                 if case .failure(let error) = result {
                     DispatchQueue.main.async {
-                        self?.addMessage("Error: \(error.localizedDescription)", type: .assistant)
+                        let aiError = AIServiceError.from(error)
+                        self?.addMessage(aiError.localizedDescription, type: .assistant)
                         self?.processingStage = .none
                     }
                 }

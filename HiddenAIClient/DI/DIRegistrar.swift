@@ -106,13 +106,15 @@ class DIRegistrar {
         )
         container.registerSingleton(WindowManagerProtocol.self, instance: windowManager)
         
-        // ConversationViewModel - register as singleton to preserve state
-        let conversationViewModel = ConversationViewModel(
-            openAIClient: openAIClient,
-            whisperService: whisperService, 
-            notificationService: notificationService
-        )
-        container.registerSingleton(ConversationViewModel.self, instance: conversationViewModel)
+        // ConversationViewModel - register as factory (will be created on main actor when needed)
+        container.register(ConversationViewModel.self) {
+            // This will be called when the view model is first accessed from the main thread
+            return ConversationViewModel(
+                openAIClient: openAIClient,
+                whisperService: whisperService,
+                notificationService: notificationService
+            )
+        }
         
         // Register the AppDelegate as a singleton once it's created
         // This will be done in the HiddenAIClientApp.swift

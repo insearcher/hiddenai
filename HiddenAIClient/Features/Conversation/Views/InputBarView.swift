@@ -43,6 +43,9 @@ struct InputBarView: View {
                     .foregroundColor(JetBrainsTheme.textPrimary)
                     .submitLabel(.send)
                     .focused($isInputFocused)
+                    .accessibilityLabel("Message input")
+                    .accessibilityHint("Type your message to send to the AI assistant")
+                    .accessibilityValue(viewModel.inputText.isEmpty ? "Empty" : viewModel.inputText)
                     .onTapGesture {
                         isInputFocused = true
                     }
@@ -95,6 +98,9 @@ struct InputBarView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isProcessing)
+                .accessibilityLabel("Send message")
+                .accessibilityHint("Sends your typed message to the AI assistant")
+                .accessibilityAddTraits(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : .isButton)
             }
             .padding(.horizontal, 20)
         }
