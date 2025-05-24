@@ -99,21 +99,6 @@ struct ControlBarView: View {
             .accessibilityHint("Captures a screenshot and analyzes it using GPT-4o Vision")
             .accessibilityAddTraits(viewModel.isProcessingScreenshot ? [] : .isButton)
             
-            // Processing indicator - minimal
-            if viewModel.processingStage != .none {
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: JetBrainsTheme.textSecondary))
-                        .scaleEffect(0.6)
-                    
-                    Text(viewModel.processingStage.displayText.uppercased())
-                        .font(.system(size: 10, weight: .light, design: .monospaced))
-                        .tracking(1)
-                        .foregroundColor(JetBrainsTheme.textSecondary.opacity(0.6))
-                }
-                .padding(.horizontal, 12)
-            }
-            
             Spacer()
             
             // Keyboard shortcuts - minimal display
