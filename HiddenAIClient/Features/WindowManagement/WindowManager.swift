@@ -13,7 +13,6 @@ class WindowManager: NSObject, WindowManagerProtocol {
     var window: NSWindow?
     private var globalKeyboardMonitor: Any?
     private var localKeyboardMonitor: Any?
-    private let moveDistance: CGFloat = 50 // Increased from 20 to make keyboard movement more effective
     private var isWindowHidden: Bool = false // Track window visibility state
     
     // Dependencies
@@ -243,8 +242,8 @@ class WindowManager: NSObject, WindowManagerProtocol {
                         return event
                     case 2: // Fn+Cmd+D (clear chat)
                         return event
-                    case 123, 124, 125, 126: // Arrow keys - no longer used for window movement
-                        // Window movement is now handled by mouse drag in ConversationView
+                    case 123, 124, 125, 126: // Arrow keys - not used for window movement
+                        // Window movement is handled by macOS default functionality
                         return event
                     default:
                         // For other Fn+command combinations in text fields, let them pass through
@@ -265,14 +264,12 @@ class WindowManager: NSObject, WindowManagerProtocol {
             return event
         }
         
-        // We still need a global monitor to capture Fn+Cmd+Arrow for window movement
-        // when the application doesn't have focus
+        // Global monitor kept for potential future global shortcuts
         globalKeyboardMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return }
             
-            // Global monitor no longer handles arrow keys for window movement
-            // Window movement is now handled by mouse drag in ConversationView
             // This monitor is kept for potential future global shortcuts
+            // Window movement is handled by macOS default functionality
         }
         
         // Make the window key window to receive keyboard events
@@ -280,15 +277,15 @@ class WindowManager: NSObject, WindowManagerProtocol {
             window?.makeKey()
         }
         
-        print("WindowManager: Keyboard monitoring setup completed (window movement now via mouse drag)")
+        print("WindowManager: Keyboard monitoring setup completed")
     }
     
     // Focus detection is no longer needed since we only use Command key combinations
     
     @discardableResult
     func handleKeyEvent(_ event: NSEvent) -> Bool {
-        // This method is now simplified since window movement is handled by mouse drag
-        // It's kept for future keyboard shortcuts that might be added
+        // This method is kept for future keyboard shortcuts that might be added
+        // Window movement is handled by macOS default functionality
         
         // Pass specific Fn+command shortcuts to AppDelegate
         if event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command) {

@@ -121,8 +121,7 @@ struct ControlBarView: View {
                 ForEach([
                     ("FN+⌘+R", "WHISPER"),
                     ("FN+⌘+P", "SCREENSHOT"),
-                    ("FN+⌘+D", "CLEAR"),
-                    ("DRAG", "MOVE")
+                    ("FN+⌘+D", "CLEAR")
                 ], id: \.0) { shortcut, label in
                     HStack(spacing: 8) {
                         Text(shortcut)
