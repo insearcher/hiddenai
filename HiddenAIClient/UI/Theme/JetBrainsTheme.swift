@@ -7,67 +7,73 @@
 
 import SwiftUI
 
-/// A modern, JetBrains IDE-inspired theme for the app
+/// A modern, austere dark theme for the app
 struct JetBrainsTheme {
     // MARK: - Colors
     
-    /// Primary background color (darkest)
-    static let backgroundPrimary = Color(hex: "#1E1F22")
+    /// Primary background color (very dark)
+    static let backgroundPrimary = Color(hex: "#0A0A0A")
     
     /// Secondary background color (for cards, panels)
-    static let backgroundSecondary = Color(hex: "#2B2D30")
+    static let backgroundSecondary = Color(hex: "#141414")
     
     /// Tertiary background color (for nested elements)
-    static let backgroundTertiary = Color(hex: "#313438")
+    static let backgroundTertiary = Color(hex: "#1A1A1A")
     
-    /// Primary accent color (blue)
-    static let accentPrimary = Color(hex: "#3574F0")
+    /// Primary accent color (muted blue)
+    static let accentPrimary = Color(hex: "#4A6FA5")
     
-    /// Secondary accent color (purple)
-    static let accentSecondary = Color(hex: "#A36AF9")
+    /// Secondary accent color (muted purple)
+    static let accentSecondary = Color(hex: "#6B5B95")
     
-    /// Primary text color (nearly white)
-    static let textPrimary = Color(hex: "#DFE1E5")
+    /// Main accent color (alias for accentPrimary)
+    static let accentColor = accentPrimary
     
-    /// Secondary text color (gray)
-    static let textSecondary = Color(hex: "#8C8C8C")
+    /// Primary text color (slightly dimmed white)
+    static let textPrimary = Color(hex: "#E0E0E0")
     
-    /// Border color for UI elements
-    static let border = Color(hex: "#393B40")
+    /// Secondary text color (muted gray)
+    static let textSecondary = Color(hex: "#808080")
     
-    /// Success color (green)
-    static let success = Color(hex: "#369668")
+    /// Border color for UI elements (very subtle)
+    static let border = Color(hex: "#242424")
     
-    /// Error color (red)
-    static let error = Color(hex: "#F93967")
+    /// Success color (muted green)
+    static let success = Color(hex: "#4A7C59")
     
-    /// Warning color (yellow)
-    static let warning = Color(hex: "#FFC700")
+    /// Error color (muted red)
+    static let error = Color(hex: "#8B4049")
+    
+    /// Warning color (muted amber)
+    static let warning = Color(hex: "#A67F00")
     
     /// User message background
-    static let userMessage = Color(hex: "#2B2D30")
+    static let userMessage = Color(hex: "#0F0F0F")
     
     /// Assistant message background
-    static let assistantMessage = Color(hex: "#25292E")
+    static let assistantMessage = Color(hex: "#121212")
     
     /// Code block background
-    static let codeBackground = Color(hex: "#1A1D21")
+    static let codeBackground = Color(hex: "#080808")
     
     // MARK: - Gradients
     
-    /// Main background gradient
+    /// Main background gradient (subtle)
     static let backgroundGradient = LinearGradient(
         gradient: Gradient(colors: [
-            Color(hex: "#1A1A1A"),
-            Color(hex: "#262930")
+            Color(hex: "#0A0A0A"),
+            Color(hex: "#0F0F0F")
         ]),
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
     
-    /// Accent gradient
+    /// Accent gradient (subtle)
     static let accentGradient = LinearGradient(
-        gradient: Gradient(colors: [accentPrimary, accentSecondary]),
+        gradient: Gradient(colors: [
+            Color(hex: "#4A6FA5").opacity(0.8),
+            Color(hex: "#6B5B95").opacity(0.8)
+        ]),
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
@@ -87,12 +93,12 @@ struct JetBrainsTheme {
     /// Style for cards and panels
     static func cardStyle<Content: View>(_ content: Content) -> some View {
         content
-            .padding()
+            .padding(16)
             .background(backgroundSecondary)
-            .cornerRadius(8)
+            .cornerRadius(4)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(border.opacity(0.5), lineWidth: 0.5)
             )
     }
 }
@@ -103,15 +109,13 @@ struct JetBrainsTheme {
 struct JetBrainsPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(configuration.isPressed ? JetBrainsTheme.accentPrimary.opacity(0.8) : JetBrainsTheme.accentPrimary)
-            .foregroundColor(.white)
-            .cornerRadius(4)
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(JetBrainsTheme.accentPrimary.opacity(0.3), lineWidth: 1)
-            )
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(configuration.isPressed ? 
+                JetBrainsTheme.accentPrimary.opacity(0.6) : 
+                JetBrainsTheme.accentPrimary.opacity(0.8))
+            .foregroundColor(JetBrainsTheme.textPrimary)
+            .cornerRadius(2)
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
@@ -121,14 +125,16 @@ struct JetBrainsPrimaryButtonStyle: ButtonStyle {
 struct JetBrainsSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(configuration.isPressed ? JetBrainsTheme.border.opacity(0.3) : Color.clear)
-            .foregroundColor(JetBrainsTheme.textPrimary)
-            .cornerRadius(4)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(configuration.isPressed ? 
+                JetBrainsTheme.border.opacity(0.2) : 
+                Color.clear)
+            .foregroundColor(JetBrainsTheme.textSecondary)
+            .cornerRadius(2)
             .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(JetBrainsTheme.border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(JetBrainsTheme.border.opacity(0.8), lineWidth: 0.5)
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
@@ -164,7 +170,7 @@ extension Color {
     }
 }
 
-/// Toggle style with JetBrains appearance
+/// Toggle style with austere appearance
 struct JetBrainsToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack {
@@ -174,14 +180,16 @@ struct JetBrainsToggleStyle: ToggleStyle {
             
             ZStack {
                 Capsule()
-                    .frame(width: 50, height: 24)
-                    .foregroundColor(configuration.isOn ? JetBrainsTheme.accentPrimary : JetBrainsTheme.border)
+                    .frame(width: 44, height: 22)
+                    .foregroundColor(configuration.isOn ? 
+                        JetBrainsTheme.accentPrimary.opacity(0.6) : 
+                        JetBrainsTheme.border)
                 
                 Circle()
-                    .foregroundColor(.white)
+                    .foregroundColor(JetBrainsTheme.textPrimary.opacity(0.9))
                     .padding(2)
-                    .frame(width: 22, height: 22)
-                    .offset(x: configuration.isOn ? 13 : -13)
+                    .frame(width: 18, height: 18)
+                    .offset(x: configuration.isOn ? 11 : -11)
                     .animation(.spring(response: 0.2), value: configuration.isOn)
             }
             .onTapGesture {
@@ -193,16 +201,16 @@ struct JetBrainsToggleStyle: ToggleStyle {
     }
 }
 
-/// Text field style with JetBrains appearance
+/// Text field style with austere appearance
 struct JetBrainsTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
-            .padding(10)
+            .padding(12)
             .background(JetBrainsTheme.backgroundTertiary)
-            .cornerRadius(4)
+            .cornerRadius(2)
             .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(JetBrainsTheme.border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(JetBrainsTheme.border.opacity(0.5), lineWidth: 0.5)
             )
             .foregroundColor(JetBrainsTheme.textPrimary)
     }

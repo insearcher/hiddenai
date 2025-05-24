@@ -3,6 +3,7 @@
 //  HiddenAIClient
 //
 //  Created on 4/20/25.
+//  Updated to use Fn+Cmd+ shortcuts (Fn+Cmd+R for Whisper, Fn+Cmd+P for Screenshot, Fn+Cmd+D for Clear Chat)
 //
 
 import SwiftUI
@@ -11,126 +12,219 @@ import SwiftUI
 struct ControlBarView: View {
     @ObservedObject var viewModel: ConversationViewModel
     var showSettings: () -> Void
+    @State private var isHoveringWhisper = false
+    @State private var isHoveringScreenshot = false
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Whisper record button
+        HStack(spacing: 16) {
+            // Enhanced Whisper record button with animations
             Button(action: viewModel.toggleWhisperRecording) {
-                HStack(spacing: 6) {
-                    Image(systemName: viewModel.isWhisperRecording ? "stop.circle.fill" : "waveform.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(viewModel.isWhisperRecording ? JetBrainsTheme.error : JetBrainsTheme.accentSecondary)
+                HStack(spacing: 8) {
+                    Image(systemName: whisperIconName)
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundColor(whisperIconColor)
+                        .scaleEffect(viewModel.isWhisperRecording ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 0.15), value: viewModel.isWhisperRecording)
                     
-                    Text(viewModel.isWhisperRecording ? "Stop Whisper" : "Whisper")
-                        .font(.system(size: 14))
-                        .foregroundColor(JetBrainsTheme.textPrimary)
+                    Text(whisperButtonText)
+                        .font(.system(size: 11, weight: .light, design: .monospaced))
+                        .tracking(1)
+                        .foregroundColor(whisperTextColor)
+                    
+                    // Recording time display
+                    if viewModel.isWhisperRecording {
+                        Text(viewModel.whisperRecordingTime)
+                            .font(.system(size: 10, weight: .light, design: .monospaced))
+                            .foregroundColor(JetBrainsTheme.error.opacity(0.7))
+                            .transition(.opacity.combined(with: .slide))
+                    }
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
-                .background(
-                    viewModel.isWhisperRecording ? 
-                        JetBrainsTheme.error.opacity(0.15) : 
-                        JetBrainsTheme.backgroundTertiary
-                )
-                .cornerRadius(6)
+                .padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .background(whisperBackgroundColor)
+                .cornerRadius(2)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(
-                            viewModel.isWhisperRecording ? 
-                                JetBrainsTheme.error.opacity(0.5) : 
-                                JetBrainsTheme.border,
-                            lineWidth: 1
-                        )
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(whisperBorderColor, lineWidth: 0.5)
                 )
+                .scaleEffect(isHoveringWhisper ? 1.02 : 1.0)
+                .animation(.easeInOut(duration: 0.15), value: isHoveringWhisper)
             }
             .buttonStyle(PlainButtonStyle())
-            .help("Record audio and transcribe with OpenAI Whisper (Cmd+R)")
+            .onHover { hovering in
+                isHoveringWhisper = hovering
+            }
+            .help("Record audio and transcribe with OpenAI Whisper (Fn+Cmd+R)")
+            .accessibilityLabel(viewModel.isWhisperRecording ? "Stop recording" : "Start whisper recording")
+            .accessibilityHint("Records audio and transcribes it using OpenAI Whisper")
+            .accessibilityAddTraits(.isButton)
             
-            // Screenshot button
+            // Enhanced Screenshot button with animations
             Button(action: viewModel.captureScreenshot) {
-                HStack(spacing: 6) {
-                    Image(systemName: viewModel.isProcessingScreenshot ? "hourglass" : "camera.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(viewModel.isProcessingScreenshot ? JetBrainsTheme.warning : JetBrainsTheme.accentPrimary)
-                    
-                    Text(viewModel.isProcessingScreenshot ? "Processing..." : "Screenshot")
-                        .font(.system(size: 14))
-                        .foregroundColor(JetBrainsTheme.textPrimary)
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
-                .background(
-                    viewModel.isProcessingScreenshot ? 
-                        JetBrainsTheme.warning.opacity(0.15) : 
-                        JetBrainsTheme.backgroundTertiary
-                )
-                .cornerRadius(6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(
+                HStack(spacing: 8) {
+                    Image(systemName: screenshotIconName)
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundColor(screenshotIconColor)
+                        .rotationEffect(.degrees(viewModel.isProcessingScreenshot ? 360 : 0))
+                        .animation(
                             viewModel.isProcessingScreenshot ? 
-                                JetBrainsTheme.warning.opacity(0.5) : 
-                                JetBrainsTheme.border,
-                            lineWidth: 1
+                                .linear(duration: 2).repeatForever(autoreverses: false) : 
+                                .default, 
+                            value: viewModel.isProcessingScreenshot
                         )
+                    
+                    Text(screenshotButtonText)
+                        .font(.system(size: 11, weight: .light, design: .monospaced))
+                        .tracking(1)
+                        .foregroundColor(screenshotTextColor)
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .background(screenshotBackgroundColor)
+                .cornerRadius(2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(screenshotBorderColor, lineWidth: 0.5)
                 )
+                .scaleEffect(isHoveringScreenshot ? 1.02 : 1.0)
+                .animation(.easeInOut(duration: 0.15), value: isHoveringScreenshot)
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(viewModel.isProcessingScreenshot)
-            .help("Capture screen and analyze with GPT-4o (Cmd+P)")
+            .onHover { hovering in
+                isHoveringScreenshot = hovering && !viewModel.isProcessingScreenshot
+            }
+            .help("Capture screen and analyze with GPT-4o (Fn+Cmd+P)")
+            .accessibilityLabel(viewModel.isProcessingScreenshot ? "Processing screenshot" : "Capture screenshot")
+            .accessibilityHint("Captures a screenshot and analyzes it using GPT-4o Vision")
+            .accessibilityAddTraits(viewModel.isProcessingScreenshot ? [] : .isButton)
             
             Spacer()
             
-            // Keyboard shortcuts
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text("⌘+R")
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(JetBrainsTheme.accentSecondary.opacity(0.15))
-                        .cornerRadius(4)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(JetBrainsTheme.accentSecondary.opacity(0.3), lineWidth: 1)
-                        )
-                    
-                    Text("Whisper")
-                        .font(.system(size: 12))
-                        .foregroundColor(JetBrainsTheme.textSecondary)
-                }
-                
-                HStack(spacing: 6) {
-                    Text("⌘+P")
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(JetBrainsTheme.accentPrimary.opacity(0.15))
-                        .cornerRadius(4)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(JetBrainsTheme.accentPrimary.opacity(0.3), lineWidth: 1)
-                        )
-                    
-                    Text("Screenshot")
-                        .font(.system(size: 12))
-                        .foregroundColor(JetBrainsTheme.textSecondary)
-                }
-            }
-            
-            // Status indicators
-            if viewModel.isProcessing {
-                HStack(spacing: 5) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: JetBrainsTheme.textPrimary))
-                        .scaleEffect(0.7)
-                    
-                    Text("Processing...")
-                        .font(.system(size: 12))
-                        .foregroundColor(JetBrainsTheme.textSecondary)
+            // Keyboard shortcuts - minimal display
+            VStack(alignment: .trailing, spacing: 3) {
+                ForEach([
+                    ("FN+⌘+R", "WHISPER"),
+                    ("FN+⌘+P", "SCREENSHOT"),
+                    ("FN+⌘+D", "CLEAR")
+                ], id: \.0) { shortcut, label in
+                    HStack(spacing: 8) {
+                        Text(shortcut)
+                            .font(.system(size: 10, weight: .light, design: .monospaced))
+                            .foregroundColor(JetBrainsTheme.textSecondary.opacity(0.5))
+                        
+                        Text(label)
+                            .font(.system(size: 10, weight: .light, design: .monospaced))
+                            .foregroundColor(JetBrainsTheme.textSecondary.opacity(0.4))
+                            .tracking(1)
+                    }
                 }
             }
         }
-        .padding(.vertical, 12)
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Enhanced UI Computed Properties
+    
+    // Whisper Button Properties
+    private var whisperIconName: String {
+        if viewModel.isWhisperRecording {
+            return "stop.fill"
+        } else {
+            return "waveform"
+        }
+    }
+    
+    private var whisperButtonText: String {
+        viewModel.isWhisperRecording ? "STOP" : "WHISPER"
+    }
+    
+    private var whisperIconColor: Color {
+        if viewModel.isWhisperRecording {
+            return JetBrainsTheme.error.opacity(0.8)
+        } else if isHoveringWhisper {
+            return JetBrainsTheme.accentPrimary.opacity(0.8)
+        } else {
+            return JetBrainsTheme.textSecondary
+        }
+    }
+    
+    private var whisperTextColor: Color {
+        if viewModel.isWhisperRecording {
+            return JetBrainsTheme.error.opacity(0.7)
+        } else if isHoveringWhisper {
+            return JetBrainsTheme.textPrimary.opacity(0.9)
+        } else {
+            return JetBrainsTheme.textSecondary
+        }
+    }
+    
+    private var whisperBackgroundColor: Color {
+        if viewModel.isWhisperRecording {
+            return JetBrainsTheme.error.opacity(0.1)
+        } else if isHoveringWhisper {
+            return JetBrainsTheme.accentPrimary.opacity(0.1)
+        } else {
+            return JetBrainsTheme.backgroundTertiary
+        }
+    }
+    
+    private var whisperBorderColor: Color {
+        if viewModel.isWhisperRecording {
+            return JetBrainsTheme.error.opacity(0.3)
+        } else if isHoveringWhisper {
+            return JetBrainsTheme.accentPrimary.opacity(0.3)
+        } else {
+            return JetBrainsTheme.border.opacity(0.3)
+        }
+    }
+    
+    // Screenshot Button Properties
+    private var screenshotIconName: String {
+        viewModel.isProcessingScreenshot ? "camera.rotate" : "camera.fill"
+    }
+    
+    private var screenshotButtonText: String {
+        viewModel.isProcessingScreenshot ? "PROCESSING" : "SCREENSHOT"
+    }
+    
+    private var screenshotIconColor: Color {
+        if viewModel.isProcessingScreenshot {
+            return JetBrainsTheme.warning.opacity(0.8)
+        } else if isHoveringScreenshot {
+            return JetBrainsTheme.accentPrimary.opacity(0.8)
+        } else {
+            return JetBrainsTheme.textSecondary
+        }
+    }
+    
+    private var screenshotTextColor: Color {
+        if viewModel.isProcessingScreenshot {
+            return JetBrainsTheme.warning.opacity(0.7)
+        } else if isHoveringScreenshot {
+            return JetBrainsTheme.textPrimary.opacity(0.9)
+        } else {
+            return JetBrainsTheme.textSecondary
+        }
+    }
+    
+    private var screenshotBackgroundColor: Color {
+        if viewModel.isProcessingScreenshot {
+            return JetBrainsTheme.warning.opacity(0.1)
+        } else if isHoveringScreenshot {
+            return JetBrainsTheme.accentPrimary.opacity(0.1)
+        } else {
+            return JetBrainsTheme.backgroundTertiary
+        }
+    }
+    
+    private var screenshotBorderColor: Color {
+        if viewModel.isProcessingScreenshot {
+            return JetBrainsTheme.warning.opacity(0.3)
+        } else if isHoveringScreenshot {
+            return JetBrainsTheme.accentPrimary.opacity(0.3)
+        } else {
+            return JetBrainsTheme.border.opacity(0.3)
+        }
     }
 }

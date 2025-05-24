@@ -16,54 +16,73 @@ struct ConversationView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Minimal Header
             HStack {
-                Text("Conversation")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(JetBrainsTheme.textPrimary)
-                
-                Spacer()
-                
-                // Settings button
-                Button(action: {
-                    showSettings = true
-                }) {
-                    Image(systemName: "gear")
-                        .foregroundColor(JetBrainsTheme.textPrimary)
-                        .font(.system(size: 16))
-                        .padding(6)
-                        .background(JetBrainsTheme.backgroundTertiary)
-                        .cornerRadius(4)
+                // Title area
+                HStack {
+                    Text("HIDDEN AI")
+                        .font(.system(size: 14, weight: .light, design: .monospaced))
+                        .foregroundColor(JetBrainsTheme.textSecondary)
+                        .tracking(2)
+                    
+                    Spacer()
                 }
-                .buttonStyle(PlainButtonStyle())
-                .padding(.trailing, 8)
                 
-                // Clear button
-                Button(action: viewModel.clearConversation) {
-                    Image(systemName: "trash")
-                        .foregroundColor(JetBrainsTheme.textPrimary)
-                        .font(.system(size: 16))
-                        .padding(6)
-                        .background(JetBrainsTheme.backgroundTertiary)
-                        .cornerRadius(4)
+                // Button area
+                HStack(spacing: 8) {
+                    // Minimal settings button
+                    Button(action: {
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gear")
+                            .foregroundColor(JetBrainsTheme.textSecondary)
+                            .font(.system(size: 14, weight: .light))
+                            .frame(width: 32, height: 32)
+                            .background(JetBrainsTheme.backgroundTertiary)
+                            .cornerRadius(2)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // Clear button
+                    Button(action: viewModel.clearConversation) {
+                        Image(systemName: "trash")
+                            .foregroundColor(JetBrainsTheme.textSecondary)
+                            .font(.system(size: 14, weight: .light))
+                            .frame(width: 32, height: 32)
+                            .background(JetBrainsTheme.backgroundTertiary)
+                            .cornerRadius(2)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .buttonStyle(PlainButtonStyle())
             }
-            .padding()
-            .background(JetBrainsTheme.accentPrimary.opacity(0.9))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(JetBrainsTheme.backgroundSecondary)
             
-            // Messages area with scrolling
-            MessageListView(viewModel: viewModel)
+            // Thin separator line
+            Rectangle()
+                .fill(JetBrainsTheme.border.opacity(0.3))
+                .frame(height: 0.5)
+            
+            // Tabbed conversation area
+            TabbedConversationView(viewModel: viewModel)
             
             // Controls area
             VStack(spacing: 0) {
+                // Thin separator line
+                Rectangle()
+                    .fill(JetBrainsTheme.border.opacity(0.3))
+                    .frame(height: 0.5)
+                
                 // Text input field
                 InputBarView(viewModel: viewModel, isInputFocused: _isInputFocused)
+                    .padding(.vertical, 12)
                 
                 // Control buttons
                 ControlBarView(viewModel: viewModel, showSettings: {
                     showSettings = true
                 })
+                    .padding(.bottom, 12)
             }
             .background(JetBrainsTheme.backgroundSecondary)
         }
@@ -71,15 +90,10 @@ struct ConversationView: View {
             SettingsView()
         }
         .background(JetBrainsTheme.backgroundPrimary)
-        // Set minimum frame size
         .frame(minWidth: 400, minHeight: 300)
         .onAppear {
-            // Add a longer delay before focusing to ensure the UI is fully loaded
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 isInputFocused = true
-                print("Setting input focus to true after delay")
-                
-                // Try to focus text field through notification as well for redundancy
                 NotificationCenter.default.post(
                     name: .focusTextFieldNotification,
                     object: nil

@@ -15,16 +15,14 @@ struct MessageListView: View {
         ZStack(alignment: .bottomTrailing) {
             ScrollViewReader { scrollView in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 12) {
+                    LazyVStack(alignment: .leading, spacing: 16) {
                         ForEach(viewModel.messages) { message in
                             MessageView(message: message)
                                 .id(message.id)
                                 .onAppear {
-                                    // Track when the message becomes visible
                                     if message.id == viewModel.latestMessageId && viewModel.scrollToBottom {
-                                        // Delay to ensure rendering is complete
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                            withAnimation {
+                                            withAnimation(.easeOut(duration: 0.2)) {
                                                 scrollView.scrollTo(message.id, anchor: .bottom)
                                             }
                                         }
@@ -32,46 +30,44 @@ struct MessageListView: View {
                                 }
                         }
                         
-                        // Show recording status if Whisper is recording
+                        // Show recording status if Whisper is recording - minimal style
                         if viewModel.isWhisperRecording {
-                            HStack {
-                                Image(systemName: "waveform")
-                                    .foregroundColor(JetBrainsTheme.error)
-                                    .font(.system(size: 14))
+                            HStack(spacing: 8) {
+                                Image(systemName: "dot.radiowaves.left.and.right")
+                                    .foregroundColor(JetBrainsTheme.error.opacity(0.6))
+                                    .font(.system(size: 12, weight: .light))
                                 
-                                Text("Recording with Whisper: \(viewModel.whisperRecordingTime)")
-                                    .font(.system(size: 14, design: .monospaced))
-                                    .foregroundColor(JetBrainsTheme.error)
+                                Text("RECORDING: \(viewModel.whisperRecordingTime)")
+                                    .font(.system(size: 11, weight: .light, design: .monospaced))
+                                    .tracking(1)
+                                    .foregroundColor(JetBrainsTheme.error.opacity(0.8))
                             }
                             .padding(10)
-                            .background(JetBrainsTheme.backgroundTertiary)
-                            .cornerRadius(6)
+                            .background(JetBrainsTheme.error.opacity(0.05))
+                            .cornerRadius(2)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(JetBrainsTheme.error.opacity(0.6), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 2)
+                                    .stroke(JetBrainsTheme.error.opacity(0.2), lineWidth: 0.5)
                             )
                             .padding(.vertical, 4)
                         }
                     }
-                    .padding()
+                    .padding(20)
                     .onChange(of: viewModel.messages) { 
                         if let lastMessage = viewModel.messages.last {
                             viewModel.latestMessageId = lastMessage.id
                             
-                            // Auto-scroll to the new message if auto-scroll is enabled
                             if viewModel.scrollToBottom {
-                                withAnimation {
+                                withAnimation(.easeOut(duration: 0.2)) {
                                     scrollView.scrollTo(lastMessage.id, anchor: .bottom)
                                 }
                             } else {
-                                // Show the scroll-to-bottom button
                                 viewModel.showScrollToButton = true
                             }
                         }
                     }
                 }
                 .background(JetBrainsTheme.backgroundPrimary)
-                // Detect when user manually scrolls
                 .simultaneousGesture(
                     DragGesture().onChanged { _ in
                         viewModel.scrollToBottom = false
@@ -79,26 +75,31 @@ struct MessageListView: View {
                     }
                 )
                 
-                // Scroll to latest button appears when needed
+                // Minimal scroll to latest button
                 if viewModel.showScrollToButton && !viewModel.messages.isEmpty {
                     Button(action: {
                         if let lastId = viewModel.messages.last?.id {
-                            withAnimation {
+                            withAnimation(.easeOut(duration: 0.2)) {
                                 scrollView.scrollTo(lastId, anchor: .bottom)
                                 viewModel.scrollToBottom = true
                                 viewModel.showScrollToButton = false
                             }
                         }
                     }) {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(JetBrainsTheme.accentPrimary)
-                            .background(Circle().fill(JetBrainsTheme.backgroundPrimary))
-                            .shadow(color: JetBrainsTheme.backgroundPrimary.opacity(0.3), radius: 2)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 14, weight: .light))
+                            .foregroundColor(JetBrainsTheme.textSecondary)
+                            .frame(width: 32, height: 32)
+                            .background(JetBrainsTheme.backgroundSecondary)
+                            .cornerRadius(2)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 2)
+                                    .stroke(JetBrainsTheme.border.opacity(0.3), lineWidth: 0.5)
+                            )
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .padding(.bottom, 16)
-                    .padding(.trailing, 16)
+                    .padding(.bottom, 20)
+                    .padding(.trailing, 20)
                     .transition(.opacity)
                 }
             }

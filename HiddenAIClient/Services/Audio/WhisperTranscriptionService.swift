@@ -26,6 +26,13 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     // Private backing field for recordingTimeString property
     private var _recordingTimeString: String = "00:00"
     
+    // Debounce mechanism to prevent rapidly toggling recording
+    private var lastActionTime: Date?
+    private let minimumActionInterval: TimeInterval = 1.0
+    
+    // Last time recording was stopped - to enforce delay before starting again
+    private var lastStopTime: Date?
+    
     // Dependencies
     private let permissionManager: PermissionManagerProtocol
     private let openAIClient: OpenAIClientProtocol
@@ -59,9 +66,7 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     private func requestMicrophonePermission() {
         // Just request permission without activating the microphone
         permissionManager.requestMicrophonePermission { granted in
-            if granted {
-                print("Microphone access granted for Whisper transcription")
-            } else {
+            if !granted {
                 print("Microphone access denied - Whisper transcription will not work")
             }
         }
@@ -73,7 +78,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     func startRecording() -> Bool {
         // Check if already recording
         if isRecording {
-            print("Already recording audio for transcription")
             return true
         }
         
@@ -84,11 +88,8 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
         recordingURL = TempFileManager.shared.createTempFileURL(prefix: "whisper_recording", extension: "m4a")
         
         guard let fileURL = recordingURL else {
-            print("Failed to create recording file URL")
             return false
         }
-        
-        print("Will save Whisper recording to: \(fileURL.path)")
         
         // Recording settings for AAC format (optimal for Whisper API)
         let settings: [String: Any] = [
@@ -118,14 +119,11 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
                     name: .whisperRecordingStarted, 
                     object: ["timeString": _recordingTimeString]
                 )
-                print("Started recording for Whisper transcription")
                 return true
             } else {
-                print("Failed to start recording for Whisper transcription")
                 return false
             }
         } catch {
-            print("Error creating audio recorder: \(error.localizedDescription)")
             return false
         }
     }
@@ -155,12 +153,14 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
         recorder.stop()
         isRecording = false
         
+        // Record when we stopped to enforce delay before starting again
+        lastStopTime = Date()
+        
         // Notify that recording has stopped
         notificationService.post(
             name: .whisperRecordingStopped, 
             object: ["finalDuration": durationString]
         )
-        print("Stopped recording for Whisper transcription. Duration: \(durationString)")
         
         // Keep a reference to the file URL
         let finalFileURL = fileURL
@@ -168,48 +168,70 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
         // Release the recorder to free up microphone resources
         audioRecorder = nil
         
-        // Send the audio file to OpenAI for transcription
-        openAIClient.transcribeAudio(fileURL: finalFileURL) { [weak self] result in
-            guard let self = self else { return }
-            
-            switch result {
-            case .success(let transcript):
-                print("Received transcript from Whisper API: \(transcript)")
-                completion(.success(transcript))
+        // Check file size before sending to API - prevents empty file errors
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: finalFileURL.path)
+            if let fileSize = attributes[.size] as? Int64 {
+                if fileSize < 1000 {
+                    // File is too small, likely no audio was recorded
+                    let error = NSError(domain: "WhisperTranscriptionService", code: 400, 
+                                     userInfo: [NSLocalizedDescriptionKey: "Recording too short or no audio detected"])
+                    
+                    // Clean up the file
+                    TempFileManager.shared.deleteTempFile(finalFileURL)
+                    
+                    // Return the error
+                    completion(.failure(error))
+                    return
+                }
+            }
+        } catch {
+            // Continue anyway, let OpenAI try to process it
+        }
+        
+        // Add a small delay to ensure audio file is properly finalized
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Send the audio file to OpenAI for transcription
+            self.openAIClient.transcribeAudio(fileURL: finalFileURL) { [weak self] result in
+                guard let self = self else { return }
                 
-                // Post notification with transcript and include any context
-                var notificationData: [String: Any] = ["transcript": transcript]
-                
-                // Add context info if available
-                if let contextInfo = contextInfo {
-                    for (key, value) in contextInfo {
-                        notificationData[key] = value
+                switch result {
+                case .success(let transcript):
+                    completion(.success(transcript))
+                    
+                    // Post notification with transcript and include any context
+                    var notificationData: [String: Any] = ["transcript": transcript]
+                    
+                    // Add context info if available
+                    if let contextInfo = contextInfo {
+                        for (key, value) in contextInfo {
+                            notificationData[key] = value
+                        }
                     }
-                }
-                
-                self.notificationService.post(
-                    name: .whisperTranscriptionReceived,
-                    object: notificationData
-                )
-                
-                // Clean up the temporary audio file
-                DispatchQueue.global(qos: .background).async {
-                    TempFileManager.shared.deleteTempFile(finalFileURL)
-                }
-                
-            case .failure(let error):
-                print("Error transcribing audio: \(error.localizedDescription)")
-                completion(.failure(error))
-                
-                // Post notification about error
-                self.notificationService.post(
-                    name: .whisperTranscriptionError,
-                    object: ["error": error.localizedDescription]
-                )
-                
-                // Clean up the temporary audio file even on failure
-                DispatchQueue.global(qos: .background).async {
-                    TempFileManager.shared.deleteTempFile(finalFileURL)
+                    
+                    self.notificationService.post(
+                        name: .whisperTranscriptionReceived,
+                        object: notificationData
+                    )
+                    
+                    // Clean up the temporary audio file
+                    DispatchQueue.global(qos: .background).async {
+                        TempFileManager.shared.deleteTempFile(finalFileURL)
+                    }
+                    
+                case .failure(let error):
+                    completion(.failure(error))
+                    
+                    // Post notification about error
+                    self.notificationService.post(
+                        name: .whisperTranscriptionError,
+                        object: ["error": error.localizedDescription]
+                    )
+                    
+                    // Clean up the temporary audio file even on failure
+                    DispatchQueue.global(qos: .background).async {
+                        TempFileManager.shared.deleteTempFile(finalFileURL)
+                    }
                 }
             }
         }
@@ -217,11 +239,41 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     
     /// Toggle recording state
     func toggleRecording(contextInfo: [String: Any]? = nil, completion: @escaping (Result<String, Error>?) -> Void) {
+        // Prevent rapid toggling that can cause device conflicts
+        let now = Date()
+        if let lastAction = lastActionTime, now.timeIntervalSince(lastAction) < minimumActionInterval {
+            let error = NSError(domain: "WhisperTranscriptionService", code: 429, 
+                              userInfo: [NSLocalizedDescriptionKey: "Please wait a moment before toggling recording again"])
+            completion(.failure(error))
+            return
+        }
+        lastActionTime = now
+        
         if isRecording {
-            stopRecordingAndTranscribe(contextInfo: contextInfo) { result in
-                completion(result)
+            // When stopping, add a small delay to ensure clean audio device shutdown
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                self.stopRecordingAndTranscribe(contextInfo: contextInfo) { result in
+                    completion(result)
+                }
             }
         } else {
+            // Check if we recently stopped - add delay if needed
+            if let lastStop = lastStopTime, now.timeIntervalSince(lastStop) < 1.0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if !self.isRecording { // Double-check we haven't started in the meantime
+                        let success = self.startRecording()
+                        if success {
+                            completion(nil) // No transcript when starting recording
+                        } else {
+                            completion(.failure(NSError(domain: "WhisperTranscriptionService", 
+                                                    code: 500, 
+                                                    userInfo: [NSLocalizedDescriptionKey: "Failed to start recording"])))
+                        }
+                    }
+                }
+                return
+            }
+            
             let success = startRecording()
             if success {
                 completion(nil) // No transcript when starting recording
@@ -299,7 +351,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
         if !flag {
-            print("Recording ended unsuccessfully")
             isRecording = false
             notificationService.post(
                 name: .whisperTranscriptionError,
@@ -310,7 +361,6 @@ class WhisperTranscriptionService: NSObject, WhisperTranscriptionServiceProtocol
     
     func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
         if let error = error {
-            print("Error during recording: \(error.localizedDescription)")
             isRecording = false
             notificationService.post(
                 name: .whisperTranscriptionError,

@@ -400,11 +400,23 @@ class OpenAIClient: OpenAIClientProtocol {
             return
         }
         
-        // Verify the file exists
+        // Verify the file exists and has content
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             let error = NSError(domain: "OpenAIClient", code: 404, userInfo: [NSLocalizedDescriptionKey: "Audio file not found"])
             completion(.failure(error))
             return
+        }
+        
+        // Check file size - too small files will cause errors
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+            if let fileSize = attributes[.size] as? Int64, fileSize < 1000 {
+                let error = NSError(domain: "OpenAIClient", code: 400, userInfo: [NSLocalizedDescriptionKey: "Audio file too small (possibly no audio recorded)"])
+                completion(.failure(error))
+                return
+            }
+        } catch {
+            // Continue anyway, don't fail here
         }
         
         // Create a multipart form request
@@ -414,6 +426,9 @@ class OpenAIClient: OpenAIClientProtocol {
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        // Set longer timeout to 60 seconds instead of default 60
+        request.timeoutInterval = 60.0
         
         // Create the request body
         var requestData = Data()
@@ -428,75 +443,110 @@ class OpenAIClient: OpenAIClientProtocol {
         requestData.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n".data(using: .utf8)!)
         requestData.append("Content-Type: audio/mp4\r\n\r\n".data(using: .utf8)!)
         
-        do {
-            // Read the file data
-            let fileData = try Data(contentsOf: fileURL)
-            requestData.append(fileData)
-            requestData.append("\r\n".data(using: .utf8)!)
-            
-            // Add the final boundary
-            requestData.append("--\(boundary)--\r\n".data(using: .utf8)!)
-            
-            // Set the request body
-            request.httpBody = requestData
-            
-            // Send the request
-            let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-                guard let self = self else { return }
+        // Use retry mechanism for network operations
+        let maxRetries = 3
+        func performRequestWithRetry(retryCount: Int = 0) {
+            do {
+                // Read the file data
+                let fileData = try Data(contentsOf: fileURL)
                 
-                // Handle network errors
-                if let error = error {
-                    completion(.failure(error))
-                    return
-                }
+                // Add file data
+                var fullRequestData = requestData
+                fullRequestData.append(fileData)
+                fullRequestData.append("\r\n".data(using: .utf8)!)
                 
-                // Check HTTP response
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    let error = NSError(domain: "OpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
-                    completion(.failure(error))
-                    return
-                }
+                // Add the final boundary
+                fullRequestData.append("--\(boundary)--\r\n".data(using: .utf8)!)
                 
-                // Check status code
-                guard (200...299).contains(httpResponse.statusCode) else {
-                    var errorMessage = "HTTP Error: \(httpResponse.statusCode)"
-                    if let data = data, let responseBody = String(data: data, encoding: .utf8) {
-                        errorMessage += " - \(responseBody)"
+                // Set the request body
+                request.httpBody = fullRequestData
+                
+                // Create robust URLSession config with better timeout handling
+                let config = URLSessionConfiguration.default
+                config.timeoutIntervalForRequest = 60.0
+                config.timeoutIntervalForResource = 120.0
+                config.waitsForConnectivity = true
+                let session = URLSession(configuration: config)
+                
+                // Send the request
+                let task = session.dataTask(with: request) { [weak self] data, response, error in
+                    guard let self = self else { return }
+                    
+                    // Handle explicit cancellation error more gracefully
+                    if let error = error as NSError?, error.code == NSURLErrorCancelled {
+                        let cancelError = NSError(domain: "OpenAIClient", 
+                                                code: NSURLErrorCancelled,
+                                                userInfo: [NSLocalizedDescriptionKey: "Request was cancelled"])
+                        completion(.failure(cancelError))
+                        return
                     }
-                    let error = NSError(domain: "OpenAIClient", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMessage])
-                    completion(.failure(error))
-                    return
-                }
-                
-                // Parse response
-                guard let data = data else {
-                    let error = NSError(domain: "OpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])
-                    completion(.failure(error))
-                    return
-                }
-                
-                do {
-                    // Parse JSON response
-                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let transcript = json["text"] as? String {
-                        
-                        // Return the transcript
-                        completion(.success(transcript))
-                        
-                    } else {
-                        let error = NSError(domain: "OpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to parse transcription response"])
+                    
+                    // Handle other network errors with retry logic
+                    if let error = error {
+                        if retryCount < maxRetries {
+                            // Exponential backoff - wait longer between each retry
+                            let delay = Double(pow(2.0, Double(retryCount))) * 0.5
+                            DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+                                performRequestWithRetry(retryCount: retryCount + 1)
+                            }
+                            return
+                        } else {
+                            completion(.failure(error))
+                            return
+                        }
+                    }
+                    
+                    // Check HTTP response
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        let error = NSError(domain: "OpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+                        completion(.failure(error))
+                        return
+                    }
+                    
+                    // Check status code
+                    guard (200...299).contains(httpResponse.statusCode) else {
+                        var errorMessage = "HTTP Error: \(httpResponse.statusCode)"
+                        if let data = data, let responseBody = String(data: data, encoding: .utf8) {
+                            errorMessage += " - \(responseBody)"
+                        }
+                        let error = NSError(domain: "OpenAIClient", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMessage])
+                        completion(.failure(error))
+                        return
+                    }
+                    
+                    // Parse response
+                    guard let data = data else {
+                        let error = NSError(domain: "OpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])
+                        completion(.failure(error))
+                        return
+                    }
+                    
+                    do {
+                        // Parse JSON response
+                        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                           let transcript = json["text"] as? String {
+                            
+                            // Return the transcript
+                            completion(.success(transcript))
+                            
+                        } else {
+                            let error = NSError(domain: "OpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to parse transcription response"])
+                            completion(.failure(error))
+                        }
+                    } catch {
                         completion(.failure(error))
                     }
-                } catch {
-                    completion(.failure(error))
                 }
+                
+                task.resume()
+                
+            } catch {
+                completion(.failure(error))
             }
-            
-            task.resume()
-            
-        } catch {
-            completion(.failure(error))
         }
+        
+        // Start the request with retry mechanism
+        performRequestWithRetry()
     }
     
     // Clear conversation history (except for the system message)
@@ -709,6 +759,48 @@ class OpenAIClient: OpenAIClientProtocol {
                 name: Notification.Name("OpenAIError"),
                 object: ["error": "Error reading image file: \(error.localizedDescription)"]
             )
+        }
+    }
+    
+    // MARK: - Async API Methods (Modern Implementation)
+    
+    func sendRequest(prompt: String) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            // Use sendMessage directly to avoid notification posting
+            sendMessage(prompt) { response, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let response = response {
+                    continuation.resume(returning: response)
+                } else {
+                    continuation.resume(throwing: NSError(domain: "OpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "Unknown error"]))
+                }
+            }
+        }
+    }
+    
+    func sendRequestWithContext(prompt: String, contextMessages: [Message]) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            // Call the legacy method but handle the result directly to avoid notifications
+            sendRequestWithContext(prompt: prompt, contextMessages: contextMessages) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+    
+    func transcribeAudio(fileURL: URL) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            transcribeAudio(fileURL: fileURL) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+    
+    func sendImageRequest(imageURL: URL, prompt: String, contextInfo: [String: Any]?) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            sendImageRequest(imageURL: imageURL, prompt: prompt, contextInfo: contextInfo) { result in
+                continuation.resume(with: result)
+            }
         }
     }
 }

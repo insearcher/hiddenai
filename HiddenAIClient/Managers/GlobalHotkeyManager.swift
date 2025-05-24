@@ -25,14 +25,14 @@ class GlobalHotkeyManager {
     // Private initializer for singleton
     private init() {}
     
-    // Register global hotkeys - simplified to only try Cmd+B
+    // Register global hotkeys - updated to try Fn+Cmd+B
     func registerHotkeys() {
-        // Only try to register Cmd+B as it's the primary shortcut we need
-        let registered = tryRegisterHotkey(keyCode: 11, modifiers: UInt32(1 << 8), name: "Cmd+B")
+        // Try to register Fn+Cmd+B as the primary shortcut
+        let registered = tryRegisterHotkey(keyCode: 11, modifiers: UInt32(1 << 8 | 1 << 17), name: "Fn+Cmd+B")
         
         if !registered {
-            // If unable to register Cmd+B, try Cmd+Opt+B as a fallback
-            _ = tryRegisterHotkey(keyCode: 11, modifiers: UInt32(1 << 8 | 1 << 11), name: "Cmd+Opt+B")
+            // If unable to register Fn+Cmd+B, try Cmd+B as fallback
+            _ = tryRegisterHotkey(keyCode: 11, modifiers: UInt32(1 << 8), name: "Cmd+B (fallback)")
         }
         
         // Install event handler even if registration fails
@@ -44,7 +44,6 @@ class GlobalHotkeyManager {
         if let hotKeyRef = toggleWindowHotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
             toggleWindowHotKeyRef = nil
-            print("Unregistered global hotkey")
         }
     }
     
@@ -66,14 +65,11 @@ class GlobalHotkeyManager {
         )
         
         if result == noErr {
-            print("Successfully registered \(name) hotkey for window toggling")
             return true
         } else {
-            print("Failed to register \(name) hotkey. Error: \(result)")
-            
             // If error is -9878 (eventHotKeyExistsErr), the key is already registered by another app
             if result == -9878 {
-                print("This hotkey is already registered by another application")
+                print("Hotkey \(name) is already registered by another application")
             }
             
             return false
@@ -104,38 +100,28 @@ class GlobalHotkeyManager {
             )
             
             if err != noErr {
-                print("Error getting hotkey ID: \(err)")
                 return err
             }
             
             // Determine which hotkey was pressed
             switch hotKeyID.id {
             case HotKeyID.toggleWindow.rawValue:
-                print("Global hotkey detected - toggling window visibility")
-                
                 // Post a notification to toggle the window
                 DispatchQueue.main.async {
-                    print("GlobalHotkeyManager: Starting toggle sequence")
-                    
                     // First unhide the application if needed
                     NSApp.unhide(nil)
                     
                     // Then try to make the app active to ensure it can handle commands
                     NSApp.activate(ignoringOtherApps: true)
-                    print("GlobalHotkeyManager: Activated app")
                     
                     // Force a better delay to make sure activation completes before we toggle
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         // Then send command to toggle window visibility using the protocol
                         if let appDelegate = DIContainer.shared.resolve(AppDelegateProtocol.self) {
-                            print("GlobalHotkeyManager: Calling toggleWindowVisibility on AppDelegate")
                             appDelegate.toggleWindowVisibility()
                         } else if let appDelegate = NSApp.delegate as? AppDelegateProtocol {
                             // Fallback to NSApp.delegate but using the protocol
-                            print("GlobalHotkeyManager: Calling toggleWindowVisibility on AppDelegate (fallback)")
                             appDelegate.toggleWindowVisibility()
-                        } else {
-                            print("ERROR: GlobalHotkeyManager could not get AppDelegate")
                         }
                     }
                 }
@@ -160,8 +146,6 @@ class GlobalHotkeyManager {
         
         if err != noErr {
             print("Failed to install event handler. Error: \(err)")
-        } else {
-            print("Successfully installed event handler for hotkeys")
         }
     }
 }

@@ -3,6 +3,7 @@
 //  HiddenWindowMCP
 //
 //  Created on 4/9/25.
+//  Updated for better screen capture permission handling
 //
 
 import Foundation
@@ -78,25 +79,32 @@ class PermissionManager: PermissionManagerProtocol {
     /// Check the current status of screen capture permission
     func screenCapturePermissionStatus(completion: @escaping (PermissionStatus) -> Void) {
         Task {
+            print("Checking screen capture permission...")
             do {
                 // This call will trigger permission prompt if not already authorized
-                let _ = try await SCShareableContent.current
+                let content = try await SCShareableContent.current
+                print("Screen capture permission check successful - displays: \(content.displays.count), windows: \(content.windows.count)")
                 
                 // If we reach here, permission was granted
                 DispatchQueue.main.async {
                     completion(.authorized)
                 }
             } catch {
+                print("Screen capture permission check failed: \(error)")
+                
                 // Check error to determine permission status
-                // The error might not be a specific SCStreamError code, so we need to check the message
-                if error.localizedDescription.contains("denied") || 
-                   error.localizedDescription.contains("declined") ||
-                   error.localizedDescription.contains("not authorized") {
+                let errorString = error.localizedDescription.lowercased()
+                if errorString.contains("denied") || 
+                   errorString.contains("declined") ||
+                   errorString.contains("not authorized") ||
+                   errorString.contains("permission") {
+                    print("Screen capture permission: DENIED")
                     DispatchQueue.main.async {
                         completion(.denied)
                     }
                 } else {
                     // Other errors might indicate system issues
+                    print("Screen capture permission: RESTRICTED/ERROR")
                     DispatchQueue.main.async {
                         completion(.restricted)
                     }
@@ -116,10 +124,13 @@ class PermissionManager: PermissionManagerProtocol {
             return
         }
         
+        print("Requesting microphone permission...")
         AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
+                print("Microphone permission result: \(granted)")
+                
                 // Notify about the permission status change using NotificationService
                 self.notificationService.post(
                     name: Self.permissionStatusChanged,
@@ -144,13 +155,16 @@ class PermissionManager: PermissionManagerProtocol {
     /// Request screen capture permission
     /// - Parameter completion: Callback with result of the permission request
     func requestScreenCapturePermission(completion: @escaping (Bool) -> Void) {
+        print("Requesting screen capture permission...")
+        
         // Check current status by trying to access screen content
         Task { [weak self] in
             guard let self = self else { return }
             
             do {
                 // This call will trigger the permission prompt if not already authorized
-                let _ = try await SCShareableContent.current
+                let content = try await SCShareableContent.current
+                print("Screen capture permission granted - displays: \(content.displays.count)")
                 
                 // If we reach here, permission was granted
                 DispatchQueue.main.async {
@@ -163,6 +177,8 @@ class PermissionManager: PermissionManagerProtocol {
                     completion(true)
                 }
             } catch {
+                print("Screen capture permission denied or failed: \(error)")
+                
                 DispatchQueue.main.async {
                     // Notify about permission status change
                     self.notificationService.post(
@@ -175,7 +191,7 @@ class PermissionManager: PermissionManagerProtocol {
                     // Show settings alert
                     self.showPermissionSettingsAlert(
                         title: "Screen Recording Access Required",
-                        message: "This app needs screen recording access to capture screenshots for AI analysis. Please enable it in System Settings → Privacy & Security → Screen Recording."
+                        message: "This app needs screen recording access to capture system audio. Please enable it in System Settings → Privacy & Security → Screen Recording."
                     )
                 }
             }
@@ -204,6 +220,7 @@ class PermissionManager: PermissionManagerProtocol {
         
         // Call completion when all requests are done
         group.notify(queue: .main) {
+            print("All permissions requested - results: \(results)")
             completion(results)
         }
     }
@@ -215,17 +232,22 @@ class PermissionManager: PermissionManagerProtocol {
     ///   - title: Alert title
     ///   - message: Alert message
     private func showPermissionSettingsAlert(title: String, message: String) {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "Cancel")
+        print("Showing permission alert: \(title)")
         
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            // Open system settings
-            openSystemSettings(for: getPermissionTypeFromTitle(title))
+        // Ensure we're on the main thread for UI operations
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = title
+            alert.informativeText = message
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Cancel")
+            
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                // Open system settings
+                self.openSystemSettings(for: self.getPermissionTypeFromTitle(title))
+            }
         }
     }
     
@@ -252,6 +274,7 @@ class PermissionManager: PermissionManagerProtocol {
             urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
         }
         
+        print("Opening system settings: \(urlString)")
         if let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)
         }

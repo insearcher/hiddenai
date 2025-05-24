@@ -23,21 +23,21 @@ class CodeHighlighter {
         var color: Color {
             switch self {
             case .keyword:
-                return Color(hex: "#CF8E6D") // Orange-brown for keywords
+                return Color(hex: "#9B9B9B") // Muted gray for keywords
             case .string:
-                return Color(hex: "#6AAB73") // Green for strings
+                return Color(hex: "#7D8471") // Muted green for strings
             case .comment:
-                return Color(hex: "#808080") // Gray for comments
+                return Color(hex: "#5A5A5A") // Dark gray for comments
             case .number:
-                return Color(hex: "#6897BB") // Blue for numbers
+                return Color(hex: "#7A8A99") // Muted blue for numbers
             case .identifier:
-                return Color(hex: "#A9B7C6") // Light gray for identifiers
+                return Color(hex: "#B0B0B0") // Light gray for identifiers
             case .type:
-                return Color(hex: "#B5B6E3") // Light purple for types
+                return Color(hex: "#8B8B8B") // Medium gray for types
             case .operatorToken:
-                return Color(hex: "#A9B7C6") // Light gray for operators
+                return Color(hex: "#808080") // Gray for operators
             case .defaultToken:
-                return Color(hex: "#A9B7C6") // Default light gray
+                return Color(hex: "#A0A0A0") // Default gray
             }
         }
     }
@@ -47,7 +47,6 @@ class CodeHighlighter {
         var attributedString = AttributedString(code)
         
         // Simple patterns for common language constructs
-        // These are simplified patterns - a full syntax highlighter would be more complex
         let patterns: [(pattern: String, tokenType: TokenType)] = {
             switch language.lowercased() {
             case "swift":
@@ -108,152 +107,6 @@ class CodeHighlighter {
                     // Types
                     ("\\b(String|Integer|Double|Float|Boolean|Character|Object|List|Map|Set|Array|void|int|double|float|boolean|char|byte|short|long)\\b", .type)
                 ]
-            case "cpp", "c++":
-                return [
-                    // Keywords
-                    ("\\b(class|struct|enum|namespace|template|typedef|const|static|virtual|override|if|else|for|while|do|switch|case|break|continue|return|try|catch|throw|new|delete|this|auto|using)\\b", .keyword),
-                    // Strings
-                    ("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", .string),
-                    // Comments
-                    ("//[^\n]*", .comment),
-                    ("(/\\*)(.*?)(\\*/)", .comment),
-                    // Numbers
-                    ("\\b[0-9]+\\b", .number),
-                    // Types
-                    ("\\b(string|int|float|double|bool|char|void|size_t|nullptr|std|vector|map|set|array|unique_ptr|shared_ptr|weak_ptr)\\b", .type)
-                ]
-            case "c#", "csharp":
-                return [
-                    // Keywords
-                    ("\\b(class|struct|enum|interface|namespace|using|public|private|protected|internal|static|readonly|const|virtual|override|abstract|sealed|if|else|for|foreach|while|do|switch|case|break|continue|return|try|catch|finally|throw|new|this|base|var|void|out|ref|params)\\b", .keyword),
-                    // Strings
-                    ("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", .string),
-                    ("@\"[^\"]*(?:\"\"[^\"]*)*\"", .string),
-                    // Comments
-                    ("//[^\n]*", .comment),
-                    ("(/\\*)(.*?)(\\*/)", .comment),
-                    // Numbers
-                    ("\\b[0-9]+\\b", .number),
-                    // Types
-                    ("\\b(string|int|float|double|decimal|bool|char|object|void|var|List|Dictionary|IEnumerable|Task|Action|Func)\\b", .type)
-                ]
-            case "ruby":
-                return [
-                    // Keywords
-                    ("\\b(def|class|module|if|else|elsif|unless|case|when|while|until|for|begin|rescue|ensure|end|yield|return|break|next|redo|retry|super|self|nil|true|false|and|or|not|alias)\\b", .keyword),
-                    // Strings
-                    ("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", .string),
-                    ("'[^'\\\\]*(\\\\.[^'\\\\]*)*'", .string),
-                    // Comments
-                    ("#[^\n]*", .comment),
-                    // Numbers
-                    ("\\b[0-9]+\\b", .number)
-                ]
-            case "go", "golang":
-                return [
-                    // Keywords
-                    ("\\b(func|package|import|var|const|type|struct|interface|map|chan|if|else|for|range|switch|case|break|continue|return|go|defer|select|fallthrough)\\b", .keyword),
-                    // Strings
-                    ("`[^`]*`", .string),
-                    ("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", .string),
-                    // Comments
-                    ("//[^\n]*", .comment),
-                    ("(/\\*)(.*?)(\\*/)", .comment),
-                    // Numbers
-                    ("\\b[0-9]+\\b", .number),
-                    // Types
-                    ("\\b(string|int|int8|int16|int32|int64|uint|uint8|uint16|uint32|uint64|float32|float64|bool|byte|rune|error|interface)\\b", .type)
-                ]
-            case "rust":
-                return [
-                    // Keywords
-                    ("\\b(fn|let|mut|const|static|if|else|match|for|while|loop|break|continue|return|struct|enum|trait|impl|use|mod|pub|self|super|as|move|where|unsafe|async|await|dyn|type|extern)\\b", .keyword),
-                    // Strings
-                    ("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", .string),
-                    // Comments
-                    ("//[^\n]*", .comment),
-                    ("(/\\*)(.*?)(\\*/)", .comment),
-                    // Numbers
-                    ("\\b[0-9]+\\b", .number),
-                    // Types
-                    ("\\b(String|i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize|f32|f64|bool|char|Option|Result|Vec|Box|Rc|Arc)\\b", .type)
-                ]
-            case "html":
-                return [
-                    // Tags
-                    ("<[^>]+>", .keyword),
-                    // Attributes
-                    ("\\b([a-zA-Z\\-:]+)=", .type),
-                    // Strings
-                    ("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", .string),
-                    ("'[^'\\\\]*(\\\\.[^'\\\\]*)*'", .string),
-                    // Comments
-                    ("<!--[\\s\\S]*?-->", .comment)
-                ]
-            case "css":
-                return [
-                    // Selectors
-                    ("\\b([a-zA-Z\\-]+)\\s*\\{", .keyword),
-                    // Properties
-                    ("\\b([a-zA-Z\\-]+)\\s*:", .type),
-                    // Values
-                    (":\\s*([^;\\{]+);", .string),
-                    // Colors
-                    ("#[0-9a-fA-F]{3,6}", .number),
-                    // Comments
-                    ("/\\*[\\s\\S]*?\\*/", .comment)
-                ]
-            case "json":
-                return [
-                    // Keys
-                    ("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"\\s*:", .keyword),
-                    // Strings
-                    (":\\s*\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", .string),
-                    // Numbers
-                    ("\\b[0-9]+\\.?[0-9]*\\b", .number),
-                    // Booleans
-                    ("\\b(true|false|null)\\b", .type)
-                ]
-            case "sql":
-                return [
-                    // Keywords
-                    ("\\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|AND|OR|NOT|ORDER BY|GROUP BY|HAVING|JOIN|LEFT|RIGHT|INNER|OUTER|UNION|CREATE|ALTER|DROP|TABLE|INDEX|VIEW|TRIGGER|PROCEDURE|FUNCTION|DATABASE|SCHEMA|GRANT|REVOKE|COMMIT|ROLLBACK|BEGIN|TRANSACTION)\\b", .keyword),
-                    // Strings
-                    ("'[^'\\\\]*(\\\\.[^'\\\\]*)*'", .string),
-                    // Comments
-                    ("--[^\n]*", .comment),
-                    ("(/\\*)(.*?)(\\*/)", .comment),
-                    // Numbers
-                    ("\\b[0-9]+\\b", .number)
-                ]
-            case "xml":
-                return [
-                    // Tags
-                    ("<[^>]+>", .keyword),
-                    // Attributes
-                    ("\\b([a-zA-Z\\-:]+)=", .type),
-                    // Strings
-                    ("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", .string),
-                    ("'[^'\\\\]*(\\\\.[^'\\\\]*)*'", .string),
-                    // Comments
-                    ("<!--[\\s\\S]*?-->", .comment),
-                    // CDATA
-                    ("<!\\[CDATA\\[[\\s\\S]*?\\]\\]>", .string)
-                ]
-            case "bash", "shell", "sh":
-                return [
-                    // Keywords
-                    ("\\b(if|then|else|elif|fi|for|do|done|while|until|case|esac|function|in|select|time|exec|command|source)\\b", .keyword),
-                    // Variables
-                    ("\\$\\{?[a-zA-Z0-9_]+\\}?", .identifier),
-                    // Strings
-                    ("\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"", .string),
-                    ("'[^'\\\\]*(\\\\.[^'\\\\]*)*'", .string),
-                    // Commands
-                    ("\\b(echo|cd|pwd|ls|cat|grep|find|sed|awk|mkdir|rm|cp|mv|chmod|chown|touch|exit|return|export|source|alias)\\b", .type),
-                    // Comments
-                    ("#[^\n]*", .comment)
-                ]
             default:
                 // Generic code highlighting for unknown languages
                 return [
@@ -294,12 +147,8 @@ class CodeHighlighter {
                             // Apply foreground color
                             attributedString[range].foregroundColor = tokenType.color
                             
-                            // Apply font traits based on token type
-                            if tokenType == .keyword || tokenType == .type {
-                                attributedString[range].font = .monospacedSystemFont(ofSize: 13, weight: .semibold)
-                            } else {
-                                attributedString[range].font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-                            }
+                            // Apply font based on token type (all light weight for austere look)
+                            attributedString[range].font = .monospacedSystemFont(ofSize: 13, weight: .light)
                         }
                     }
                 }

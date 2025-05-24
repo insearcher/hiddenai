@@ -9,14 +9,56 @@ import Foundation
 import SwiftUI
 import Combine
 
-class ConversationViewModel: ObservableObject {
+/// Represents different processing stages
+enum ProcessingStage: CaseIterable {
+    case none
+    case whisperRecording
+    case whisperProcessing
+    case openAIProcessing
+    case screenshot
+    case screenshotCapturing
+    case screenshotAnalyzing
+    
+    var displayText: String {
+        switch self {
+        case .none:
+            return ""
+        case .whisperRecording:
+            return "Recording..."
+        case .whisperProcessing:
+            return "Processing: Whisper"
+        case .openAIProcessing:
+            return "Processing: OpenAI"
+        case .screenshot:
+            return "Processing: Screenshot"
+        case .screenshotCapturing:
+            return "Capturing screenshot..."
+        case .screenshotAnalyzing:
+            return "Analyzing screenshot..."
+        }
+    }
+    
+    var isProcessing: Bool {
+        self != .none
+    }
+}
+
+final class ConversationViewModel: ObservableObject {
     // MARK: - Published Properties
     
-    /// Messages displayed in the conversation
-    @Published var messages: [Message] = []
+    /// Conversation tabs containing question-answer pairs
+    @Published var conversationTabs: [ConversationTab] = []
     
-    /// Whether the app is currently processing a request
-    @Published var isProcessing: Bool = false
+    /// Currently selected tab index
+    @Published var selectedTabIndex: Int = 0
+    
+    /// Current processing stage
+    @Published var processingStage: ProcessingStage = .none
+    
+    /// Computed property for backward compatibility
+    var isProcessing: Bool {
+        return processingStage.isProcessing
+    }
     
     /// Whether the API key is set
     @Published var apiKeyIsSet: Bool = false
@@ -36,13 +78,10 @@ class ConversationViewModel: ObservableObject {
     /// Path to the last captured screenshot
     @Published var screenshotPath: String? = nil
     
-    /// Whether to automatically scroll to the bottom
+    // Legacy properties for compatibility (will be removed)
+    @Published var messages: [Message] = []
     @Published var scrollToBottom: Bool = true
-    
-    /// ID of the latest message for scrolling
     @Published var latestMessageId: UUID? = nil
-    
-    /// Whether to show the scroll to bottom button
     @Published var showScrollToButton: Bool = false
     
     // MARK: - Dependencies
@@ -94,7 +133,9 @@ class ConversationViewModel: ObservableObject {
     
     /// Clear the conversation
     func clearConversation() {
-        messages.removeAll()
+        conversationTabs.removeAll()
+        selectedTabIndex = 0
+        messages.removeAll() // Keep for compatibility
         openAIClient.clearConversation()
     }
     
@@ -130,12 +171,13 @@ class ConversationViewModel: ObservableObject {
         }
         
         isProcessingScreenshot = true
+        processingStage = .screenshotCapturing
         
         // Request screenshot capture through notification
         notificationService.post(name: .captureScreenshotRequested, object: nil)
         
-        // Add a message to indicate we're processing
-        addMessage("Capturing and analyzing screenshot...", type: .user)
+        // Don't add a permanent message - let the processing indicator handle the UI
+        // The actual screenshot content will be added when we get the OpenAI response
     }
     
     // MARK: - Message Handling
@@ -154,22 +196,58 @@ class ConversationViewModel: ObservableObject {
         )
         
         DispatchQueue.main.async {
+            // Legacy compatibility
             self.messages.append(message)
-            
-            // Set the latest message ID for scrolling
             self.latestMessageId = message.id
             
-            // Re-enable auto-scrolling when a new user message is added
-            // This ensures new conversations start with auto-scroll enabled
+            // Handle tabbed interface
             if type == .user {
+                // Create a new tab for user message
+                let newTab = ConversationTab(userMessage: message)
+                self.conversationTabs.append(newTab)
+                self.selectedTabIndex = self.conversationTabs.count - 1
                 self.scrollToBottom = true
+            } else if type == .assistant {
+                // Add assistant response to the latest tab
+                if !self.conversationTabs.isEmpty {
+                    let lastTabIndex = self.conversationTabs.count - 1
+                    let currentTab = self.conversationTabs[lastTabIndex]
+                    let updatedTab = ConversationTab(
+                        userMessage: currentTab.userMessage,
+                        assistantMessage: message,
+                        timestamp: currentTab.timestamp
+                    )
+                    self.conversationTabs[lastTabIndex] = updatedTab
+                }
             }
         }
         
         return message.id
     }
     
-    /// Process text input or transcription
+    /// Select a specific tab
+    func selectTab(at index: Int) {
+        guard index >= 0 && index < conversationTabs.count else { return }
+        selectedTabIndex = index
+    }
+    
+    /// Get the currently selected tab
+    var currentTab: ConversationTab? {
+        guard selectedTabIndex >= 0 && selectedTabIndex < conversationTabs.count else { return nil }
+        return conversationTabs[selectedTabIndex]
+    }
+    
+    /// Get messages for the current tab
+    var currentTabMessages: [Message] {
+        guard let tab = currentTab else { return [] }
+        var messages = [tab.userMessage]
+        if let assistantMessage = tab.assistantMessage {
+            messages.append(assistantMessage)
+        }
+        return messages
+    }
+    
+    /// Process text input or transcription using async method (no duplicate responses)
     /// - Parameter text: The text to process
     private func processTranscription(_ text: String) {
         // Add the user's message to the conversation
@@ -177,20 +255,22 @@ class ConversationViewModel: ObservableObject {
         
         // Send to OpenAI for processing
         if openAIClient.hasApiKey {
-            isProcessing = true
+            processingStage = .openAIProcessing
             
-            // Send a regular request - no reply context needed
-            openAIClient.sendRequest(prompt: text) { [weak self] result in
-                // Only handle failures in the completion handler
-                // Success responses are handled by the notification observer
-                if case .failure(let error) = result {
+            Task {
+                do {
+                    let response = try await openAIClient.sendRequest(prompt: text)
                     DispatchQueue.main.async {
-                        self?.addMessage("Error: \(error.localizedDescription)", type: .assistant)
-                        self?.isProcessing = false
+                        self.addMessage(response, type: .assistant)
+                        self.processingStage = .none
+                    }
+                } catch {
+                    let aiError = AIServiceError.from(error)
+                    DispatchQueue.main.async {
+                        self.addMessage(aiError.localizedDescription, type: .assistant)
+                        self.processingStage = .none
                     }
                 }
-                // We don't set isProcessing = false for success case 
-                // as the notification handler will do that
             }
         } else {
             addMessage("Please set your OpenAI API key in settings to receive responses.", type: .assistant)
@@ -209,7 +289,10 @@ class ConversationViewModel: ObservableObject {
                    let path = userInfo["path"] {
                     DispatchQueue.main.async {
                         self?.screenshotPath = path
-                        print("Screenshot captured at path: \(path)")
+                        // Update processing stage to analyzing
+                        self?.processingStage = .screenshotAnalyzing
+                        // Add a user message indicating that a screenshot was taken and is being analyzed
+                        self?.addMessage("📷 Screenshot captured", type: .user)
                     }
                 }
             }
@@ -220,11 +303,7 @@ class ConversationViewModel: ObservableObject {
             handler: { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.isProcessingScreenshot = true
-                    
-                    // Optionally add the processing message if it doesn't exist yet
-                    if !(self?.messages.contains(where: { $0.contents.first?.content.contains("Capturing and analyzing screenshot") == true }) ?? false) {
-                        self?.addMessage("Capturing and analyzing screenshot...", type: .user)
-                    }
+                    // Processing indicator is now handled by the screenshot capture notification
                 }
             }
         )
@@ -236,6 +315,7 @@ class ConversationViewModel: ObservableObject {
                    let errorMessage = userInfo["error"] {
                     DispatchQueue.main.async {
                         self?.isProcessingScreenshot = false
+                        self?.processingStage = .none
                         self?.addMessage("Screenshot error: \(errorMessage)", type: .assistant)
                     }
                 }
@@ -248,6 +328,7 @@ class ConversationViewModel: ObservableObject {
             handler: { [weak self] notification in
                 DispatchQueue.main.async {
                     self?.isWhisperRecording = true
+                    self?.processingStage = .whisperRecording
                     // Get initial time from notification if provided
                     if let userInfo = notification.object as? [String: String],
                        let initialTime = userInfo["timeString"] {
@@ -264,6 +345,7 @@ class ConversationViewModel: ObservableObject {
             handler: { [weak self] notification in
                 DispatchQueue.main.async {
                     self?.isWhisperRecording = false
+                    self?.processingStage = .whisperProcessing
                 }
             }
         )
@@ -289,6 +371,7 @@ class ConversationViewModel: ObservableObject {
                    let transcript = userInfo["transcript"] as? String,
                    !transcript.isEmpty {
                     DispatchQueue.main.async {
+                        self?.processingStage = .none  // Reset processing stage
                         self?.processTranscription(transcript)
                     }
                 }
@@ -302,23 +385,47 @@ class ConversationViewModel: ObservableObject {
                 if let userInfo = notification.object as? [String: Any],
                    let errorMessage = userInfo["error"] as? String {
                     DispatchQueue.main.async {
-                        self?.addMessage("Whisper transcription error: \(errorMessage)", type: .assistant)
+                        self?.processingStage = .none  // Reset processing stage on error
+                        
+                        // Better error handling with more user-friendly messages
+                        let friendlyMessage: String
+                        
+                        // Network errors
+                        if errorMessage.contains("cancelled") {
+                            friendlyMessage = "Transcription was cancelled due to a network issue. Please try again."
+                        } 
+                        // Empty recordings
+                        else if errorMessage.contains("too short") || errorMessage.contains("no audio") || errorMessage.contains("too small") {
+                            friendlyMessage = "Recording was too short or no audio was detected. Please try again."
+                        }
+                        // Rate limit errors
+                        else if errorMessage.contains("wait") || errorMessage.contains("429") {
+                            friendlyMessage = errorMessage
+                        }
+                        // Default error
+                        else {
+                            friendlyMessage = "Whisper transcription error: \(errorMessage)"
+                        }
+                        
+                        self?.addMessage(friendlyMessage, type: .assistant)
                     }
                 }
             }
         )
         
-        // OpenAI API responses
+        // OpenAI API responses (handles both async and legacy callback responses)
         addNotificationObserver(
             forName: Notification.Name("OpenAIResponseReceived"),
             handler: { [weak self] notification in
                 if let userInfo = notification.object as? [String: Any],
                    let response = userInfo["response"] as? String {
                     DispatchQueue.main.async {
+                        // Add the response message to the conversation
+                        // This handles screenshot responses and other legacy callback-based responses
                         self?.addMessage(response, type: .assistant)
                         
-                        // Always stop processing indicators after a response
-                        self?.isProcessing = false
+                        // Clear processing state
+                        self?.processingStage = .none
                         self?.isProcessingScreenshot = false
                     }
                 }
@@ -332,8 +439,23 @@ class ConversationViewModel: ObservableObject {
                 if let userInfo = notification.object as? [String: Any],
                    let error = userInfo["error"] as? String {
                     DispatchQueue.main.async {
-                        self?.addMessage("Error: \(error)", type: .assistant)
-                        self?.isProcessing = false
+                        // Customize error messages for better UX
+                        let friendlyMessage: String
+                        
+                        if error.contains("API key not set") {
+                            friendlyMessage = "Please set your OpenAI API key in settings to use this feature."
+                        } else if error.contains("cancelled") {
+                            friendlyMessage = "Request was cancelled. Please try again."
+                        } else if error.contains("timeout") || error.contains("timed out") {
+                            friendlyMessage = "Connection timed out. Please check your internet connection and try again."
+                        } else if error.contains("Screen") && error.contains("permission") {
+                            friendlyMessage = "Screen recording permission is required. Please check your Privacy settings."
+                        } else {
+                            friendlyMessage = "Error: \(error)"
+                        }
+                        
+                        self?.addMessage(friendlyMessage, type: .assistant)
+                        self?.processingStage = .none
                         self?.isProcessingScreenshot = false
                     }
                 }

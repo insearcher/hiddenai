@@ -3,6 +3,9 @@
 //  HiddenAIClient
 //
 //  Created by Maxim Frolov on 4/8/25.
+//  Updated to use SystemAudioRecorder for system + microphone audio recording
+//  Updated all keyboard shortcuts to use Fn+Cmd+ combinations
+//  Updated Whisper shortcut to Fn+Cmd+R and added Fn+Cmd+D for clear chat
 //
 
 import SwiftUI
@@ -15,8 +18,8 @@ struct HiddenAIClientApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     init() {
-        // Configure DI container before the app initializes
-        DIRegistrar.configure()
+        // Configure DI container to use system + microphone audio recorder
+        DIRegistrar.configure(audioRecorderType: .systemAndMicrophone)
         
         // Register app delegate after it's created by SwiftUI
         // This works because @NSApplicationDelegateAdaptor initializes the delegate
@@ -121,7 +124,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
         
         // Show main conversation view
         windowManager.showWindow(with: viewFactory.makeConversationView())
-        print("Open source mode: Showing main UI")
         
         // Set up global key event monitoring
         setupKeyEventMonitoring()
@@ -143,9 +145,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
             object: nil
         )
         
-        // Pre-request screen capture permission
+        // Pre-request screen capture permission (needed for system audio)
         permissionManager.requestScreenCapturePermission { granted in
-            print("Screen capture permission \(granted ? "granted" : "denied")")
+            if !granted {
+                print("System audio recording requires screen capture permission")
+            }
         }
         
         // Perform additional setup after a slight delay
@@ -153,27 +157,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
             self.ensureAppIsHidden()
             
             // Reset the window hidden state to false on startup
-            // This ensures a clean slate for toggling
             self.windowHidden = false
-            print("Initial window hidden state reset to false")
         }
     }
     
     private func setupKeyEventMonitoring() {
         // Using both local and global event monitors for reliable key detection
-        // Only focusing on the required shortcuts: Cmd+B, Cmd+Q, and Cmd+V
+        // Updated shortcuts: Fn+Cmd+B, Fn+Cmd+R, Fn+Cmd+P, Fn+Cmd+D, and Fn+Cmd+Q
         
         // Set up a local monitor to catch key events within our own app
         // This works even when text fields have focus
         let localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return event }
             
-            // Only handle Command key combinations
-            let hasCommandModifier = event.modifierFlags.contains(.command)
-            if hasCommandModifier {
-                print("AppDelegate local monitor detected Command key: \(event.keyCode)")
-                
-                let handled = self.handleCommandKeyCombo(event)
+            // Only handle Fn+Command key combinations
+            let hasFnCommandModifier = event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command)
+            if hasFnCommandModifier {
+                let handled = self.handleFnCommandKeyCombo(event)
                 if handled {
                     return nil // Prevent the event from propagating if we handled it
                 }
@@ -191,42 +191,43 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
         NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return }
             
-            // Only handle Command key combinations
-            let hasCommandModifier = event.modifierFlags.contains(.command)
-            if hasCommandModifier {
-                print("AppDelegate global monitor detected Command key: \(event.keyCode)")
-                self.handleCommandKeyCombo(event)
+            // Only handle Fn+Command key combinations
+            let hasFnCommandModifier = event.modifierFlags.contains(.function) && event.modifierFlags.contains(.command)
+            if hasFnCommandModifier {
+                self.handleFnCommandKeyCombo(event)
             }
         }
     }
     
-    // Helper method to handle command key combinations - simplified to only handle required shortcuts
+    // Helper method to handle Fn+command key combinations
     @discardableResult
-    private func handleCommandKeyCombo(_ event: NSEvent) -> Bool {
+    private func handleFnCommandKeyCombo(_ event: NSEvent) -> Bool {
         switch event.keyCode {
-            case 11: // Cmd+B (toggle window visibility)
-                print("AppDelegate processing Cmd+B key - toggling window visibility")
+            case 11: // Fn+Cmd+B (toggle window visibility)
                 DispatchQueue.main.async {
                     self.toggleWindowVisibility()
                 }
                 return true
                 
-            case 15: // Cmd+R (toggle Whisper transcription)
-                print("AppDelegate processing Cmd+R key - toggling Whisper transcription")
+            case 15: // Fn+Cmd+R (toggle Whisper transcription)
                 DispatchQueue.main.async {
                     self.toggleWhisperTranscription()
                 }
                 return true
                 
-            case 35: // Cmd+P (capture screenshot)
-                print("AppDelegate processing Cmd+P key - capturing screenshot")
+            case 35: // Fn+Cmd+P (capture screenshot)
                 DispatchQueue.main.async {
                     self.captureScreenshot()
                 }
                 return true
                 
-            case 12: // Cmd+Q (quit app)
-                print("AppDelegate processing Cmd+Q key - quitting app")
+            case 2: // Fn+Cmd+D (clear chat history)
+                DispatchQueue.main.async {
+                    self.clearChatHistory()
+                }
+                return true
+                
+            case 12: // Fn+Cmd+Q (quit app)
                 DispatchQueue.main.async {
                     self.quitApp()
                 }
@@ -256,20 +257,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
             // Activate the app to ensure it receives events properly
             NSApp.activate(ignoringOtherApps: true)
             
-            // Hide the app from dock using LSUIElement (already set in Info.plist)
-            // The window will still be visible but the app icon won't appear in dock
-            print("AppDelegate: Window activated without showing in dock")
-        } else {
-            print("ERROR: AppDelegate could not find window to activate")
         }
-        
-        // Print a message to confirm keyboard shortcut handlers are active
-        print("AppDelegate: Keyboard shortcut handlers are set up - limited to Cmd+B, Cmd+R, Cmd+P, and Cmd+Q")
     }
     
     // Add method to toggle Whisper transcription
     @objc func toggleWhisperTranscription() {
-        print("AppDelegate toggleWhisperTranscription called")
         
         // Check if we have an API key first
         if !openAIClient.hasApiKey {
@@ -319,11 +311,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
     }
     
     @objc func toggleWindowVisibility() {
-        print("AppDelegate toggleWindowVisibility called")
-        
         // Skip if we're already processing a toggle
         if isProcessingToggle {
-            print("Toggle already in progress, ignoring duplicate call")
             return
         }
         
@@ -333,7 +322,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
         // Make sure we're on the main thread
         if !Thread.isMainThread {
             DispatchQueue.main.async {
-                // Call self but on main thread
                 self.isProcessingToggle = false  // Reset flag since we're recursing
                 self.toggleWindowVisibility()
             }
@@ -343,38 +331,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
         // Ensure app is active before toggling
         NSApp.activate(ignoringOtherApps: true)
         
-        // Double check we have a window
+        // Check if we have a window
         let hasWindow = (windowManager.window != nil)
-        print("AppDelegate toggleWindowVisibility - Current hasWindow: \(hasWindow)")
         
-        // Call the window manager's method directly
-        print("AppDelegate directly calling windowManager.toggleWindowVisibility()")
         if hasWindow {
             // Window exists, proceed with toggling
             windowManager.toggleWindowVisibility()
-            
-            // Update our window visibility state
             windowHidden = !windowHidden
-            print("Window visibility toggled - now \(windowHidden ? "hidden" : "visible")")
         } else {
-            print("ERROR: Window is nil, attempting to recreate it")
             // If window doesn't exist, try to recreate it
             windowManager.showWindow(with: viewFactory.makeConversationView())
-            print("Window recreated")
             
             // Wait a moment and then try to toggle visibility again
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                print("Retrying toggle after window recreation")
                 self.windowManager.toggleWindowVisibility()
                 self.windowHidden = !self.windowHidden
-                print("Window visibility toggled after recreation - now \(self.windowHidden ? "hidden" : "visible")")
             }
         }
         
         // Reset the flag after a short delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.isProcessingToggle = false
-            print("Toggle processing completed")
         }
     }
     
@@ -415,19 +392,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
                 
                 // Update state
                 windowHidden = false
-                print("Window restored without recreating content")
             } else {
                 // Only create a new window if we don't have one
                 windowManager.showWindow(with: viewFactory.makeConversationView())
                 windowHidden = false
-                print("Window was nil, created new window")
             }
         }
     }
     
     /// Capture a screenshot and send it to OpenAI
     @objc func captureScreenshot(_ notification: Notification? = nil) {
-        print("AppDelegate captureScreenshot called")
         
         // Check if we have an API key first
         if !openAIClient.hasApiKey {
@@ -460,10 +434,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
             if status == .authorized {
                 // Execute the screenshot capture on the main thread
                 DispatchQueue.main.async {
-                    let success = self.screenshotService.captureScreenshot(contextInfo: contextInfo)
-                    if !success {
-                        print("Failed to capture screenshot")
-                    }
+                    self.screenshotService.captureScreenshot(contextInfo: contextInfo)
                 }
             } else {
                 // Request permission
@@ -473,13 +444,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
                     if granted {
                         // Execute on main thread after permission granted
                         DispatchQueue.main.async {
-                            let success = self.screenshotService.captureScreenshot(contextInfo: contextInfo)
-                            if !success {
-                                print("Failed to capture screenshot")
-                            }
+                            self.screenshotService.captureScreenshot(contextInfo: contextInfo)
                         }
                     } else {
-                        print("Screen capture permission denied")
                         // Notify user about permission denied
                         DispatchQueue.main.async {
                             self.notificationService.post(
@@ -527,15 +494,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, AppDelegateProtocol {
         }
     }
     
+    /// Clear chat history
+    @objc func clearChatHistory() {
+        // Get the conversation view model and clear the conversation
+        if let viewModel = DIContainer.shared.resolve(ConversationViewModel.self) {
+            DispatchQueue.main.async {
+                viewModel.clearConversation()
+            }
+        }
+    }
+    
     // Request all permissions needed by the app
     private func requestAppPermissions() {
         // Request all permissions through the PermissionManager
         permissionManager.requestAllPermissions { results in
-            print("Permission request results: \(results)")
-            
             // Only set up permissions, we'll initialize components on demand
             if results[.microphone] != true {
                 print("Microphone permission denied - recording functionality will be limited")
+            }
+            if results[.screenCapture] != true {
+                print("Screen capture permission denied - system audio recording will not work")
             }
         }
     }
